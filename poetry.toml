@@ -1,0 +1,5 @@
+# This file contains poetry settings, which currently cannot be controlled from pyproject.toml
+# They don't plan on implementing this. See:
+#   https://github.com/python-poetry/poetry/issues/2937#issuecomment-1159697636
+[virtualenvs]
+in-project = true

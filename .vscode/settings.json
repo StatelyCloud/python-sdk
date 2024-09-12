@@ -1,0 +1,4 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder:sdk/python}/.venv/bin/python",
+  "python.testing.pytestEnabled": true
+}
