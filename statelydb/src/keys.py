@@ -13,7 +13,6 @@ from statelydb.src.errors import StatelyError
 if TYPE_CHECKING:
     from statelydb.src.types import AllKeyTypes
 
-BYTE_SIGIL = "~"
 
 
 def key_path(template: str, **kwargs: AllKeyTypes) -> str:
@@ -53,7 +52,7 @@ def key_id(val: AllKeyTypes) -> str:
         or if the value is invalid
     """
     if isinstance(val, bytes):
-        return f"{BYTE_SIGIL}{encode_bytes(val)}"
+        return f"{encode_bytes(val)}"
     if isinstance(val, str):
         return val
     if isinstance(val, int):
@@ -65,7 +64,7 @@ def key_id(val: AllKeyTypes) -> str:
             )
         return str(val)
     if isinstance(val, UUID):  # type: ignore[reportUnnecessaryIsInstance]
-        return f"{BYTE_SIGIL}{encode_bytes(val.bytes)}"
+        return f"{encode_bytes(val.bytes)}"
     raise StatelyError(
         stately_code="InvalidKeyPath",
         grpc_code=Status.INVALID_ARGUMENT,

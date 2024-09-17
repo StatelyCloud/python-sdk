@@ -15,7 +15,7 @@ def test_key_path__single_level_paths() -> None:
     assert key_path("/foo-{id}", id=1234) == "/foo-1234"
     assert (
         key_path("/foo-{id}", id=UUID("f4a8a24a-129d-411f-91d2-6d19d0eaa096"))
-        == "/foo-~9KiiShKdQR-R0m0Z0Oqglg"
+        == "/foo-9KiiShKdQR-R0m0Z0Oqglg"
     )
 
 
@@ -33,7 +33,7 @@ def test_key_path__partial_paths() -> None:
 def test_key_id__uuid() -> None:
     assert (
         key_id(UUID("00000000-0000-0000-0000-000000000005"))
-        == "~AAAAAAAAAAAAAAAAAAAABQ"
+        == "AAAAAAAAAAAAAAAAAAAABQ"
     )
 
 
@@ -42,7 +42,7 @@ def test_key_id__string() -> None:
 
 
 def test_key_id__binary() -> None:
-    assert key_id(b"\x00\x01\x02\x03") == "~AAECAw"
+    assert key_id(b"\x00\x01\x02\x03") == "AAECAw"
 
 
 def test_key_id__int() -> None:
