@@ -6,14 +6,16 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ScanRootPathsRequest(_message.Message):
-    __slots__ = ("store_id", "limit", "pagination_token")
+    __slots__ = ("store_id", "limit", "pagination_token", "schema_version_id")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     PAGINATION_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     limit: int
     pagination_token: bytes
-    def __init__(self, store_id: _Optional[int] = ..., limit: _Optional[int] = ..., pagination_token: _Optional[bytes] = ...) -> None: ...
+    schema_version_id: int
+    def __init__(self, store_id: _Optional[int] = ..., limit: _Optional[int] = ..., pagination_token: _Optional[bytes] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
 
 class ScanRootPathsResponse(_message.Message):
     __slots__ = ("results", "pagination_token")

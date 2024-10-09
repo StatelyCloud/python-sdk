@@ -32,8 +32,7 @@ def test_key_path__partial_paths() -> None:
 
 def test_key_id__uuid() -> None:
     assert (
-        key_id(UUID("00000000-0000-0000-0000-000000000005"))
-        == "AAAAAAAAAAAAAAAAAAAABQ"
+        key_id(UUID("00000000-0000-0000-0000-000000000005")) == "AAAAAAAAAAAAAAAAAAAABQ"
     )
 
 

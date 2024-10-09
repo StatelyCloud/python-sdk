@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Generic, Never, TypeVar
 
 from grpclib.client import Stream
+from grpclib.const import Status
+from grpclib.exceptions import StreamTerminatedError
 
+from statelydb.src.errors import StatelyError
 from statelydb.src.sync import SyncResult
 from statelydb.src.types import StatelyItem
 
@@ -152,10 +155,23 @@ async def handle_list_response(
         # https://app.clickup.com/t/86897hejr
         msg = "Expected 'finished' to be set but it was never set"
         raise ValueError(msg)  # noqa: TRY301
-
-    except Exception as e:
+    except StreamTerminatedError as e:
+        # there's not much point in calling stream.__aexit__ if the stream
+        # is already closed
+        raise StatelyError(
+            stately_code="StreamClosed",
+            grpc_code=Status.FAILED_PRECONDITION,
+            message="List failed due to server terminated stream",
+            cause=e,
+        ) from None
+    except Exception:
+        # Manually close the stream if this generator is wrapping a stream and not a
+        # txn response generator, as this won't be invoked automatically.
+        # Don't propagate the exception to the stream, just re-raise and
+        # it will be handled in the context manager thats wrapping this generator
         if isinstance(stream, Stream):
-            # we need to manually close the stream since
-            # we can't use the async context manager as the author of grpclib intended
-            await stream.__aexit__(type(e), e, e.__traceback__)
+            # if the server returned an error then this will throw an
+            # error which will get caught in the _recv_trailing_metadata hook
+            # and get converted to a StatelyError
+            await stream.__aexit__(None, None, None)
         raise

@@ -6,12 +6,14 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class DeleteRequest(_message.Message):
-    __slots__ = ("store_id", "deletes")
+    __slots__ = ("store_id", "deletes", "schema_version_id")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     DELETES_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     deletes: _containers.RepeatedCompositeFieldContainer[DeleteItem]
-    def __init__(self, store_id: _Optional[int] = ..., deletes: _Optional[_Iterable[_Union[DeleteItem, _Mapping]]] = ...) -> None: ...
+    schema_version_id: int
+    def __init__(self, store_id: _Optional[int] = ..., deletes: _Optional[_Iterable[_Union[DeleteItem, _Mapping]]] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
 
 class DeleteItem(_message.Message):
     __slots__ = ("key_path",)

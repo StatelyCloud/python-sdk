@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from statelydb.src.types import AllKeyTypes
 
 
-
 def key_path(template: str, **kwargs: AllKeyTypes) -> str:
     """
     Construct a key path a template and a dict of named values.

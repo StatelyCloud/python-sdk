@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Self,
@@ -41,15 +42,14 @@ T = TypeVar("T", bound=StatelyItem)
 class Client:
     """Client is a Stately client that interacts with the given store."""
 
-    db_service: db.DatabaseServiceStub
-    _token_provider: AuthTokenProvider
-
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,
+        schema_version_id: int,
         token_provider: AuthTokenProvider | None = None,
-        endpoint: str = "https://api.stately.cloud",
+        endpoint: str | None = None,
+        region: str | None = None,
     ) -> None:
         """
         Construct a new Stately Client.
@@ -62,29 +62,58 @@ class Client:
             Stately Items into concrete schema types.
         :type type_mapper: BaseTypeMapper
 
+        :param schema_version_id: The schema version ID used to generate the type
+            mapper. This is used to ensure that the schema used by the client matches
+            the schema used by the server.
+        :type schema_version_id: int
+
         :param token_provider: An optional token provider function.
             Defaults to reading `STATELY_CLIENT_ID` and `STATELY_CLIENT_SECRET` from
             the environment.
         :type token_provider: AuthTokenProvider, optional
 
-        :param endpoint: The Stately endpoint to connect to.
-            Defaults to "https://api.stately.cloud".
+        :param endpoint: The Stately API endpoint to connect to.
+            Defaults to "https://api.stately.cloud" if no region is provided.
         :type endpoint: str, optional
+
+        :param region: The Stately region to connect to.
+            If region is provided and endpoint is not provided then the regional
+            endpoint will be used.
+        :type region: str, optional
 
         :return: A Client for interacting with a Stately store
         :rtype: Client
         """
         self._token_provider = token_provider or init_server_auth()
-        self._db_service = db.DatabaseServiceStub(
-            self._new_channel(endpoint),
-        )
+        self._endpoint = Client._make_endpoint(endpoint, region)
         self._store_id = store_id
+        self._schema_version_id = schema_version_id
         self._type_mapper = type_mapper
         self._allow_stale = False
 
+    # This cached_property decorator is required so that the client can be constructed
+    # within a sync context. This can be removed when the following issue is resolved:
+    # https://github.com/vmagamedov/grpclib/issues/161
+    @cached_property
+    def _db_service(self) -> db.DatabaseServiceStub:
+        return db.DatabaseServiceStub(
+            self._new_channel(self._endpoint),
+        )
+
+    @staticmethod
+    def _make_endpoint(endpoint: str | None = None, region: str | None = None) -> str:
+        if endpoint:
+            return endpoint
+        if region is None:
+            return "https://api.stately.cloud"
+
+        if region.startswith("aws-"):
+            region = region.removeprefix("aws-")
+        return f"https://{region}.aws.api.stately.cloud"
+
     def _new_channel(
         self,
-        endpoint: str = "https://api.stately.cloud",
+        endpoint: str,
     ) -> Channel:
         """Create a new grpc channel and setup interceptors."""
         url = urlparse(endpoint)
@@ -109,7 +138,10 @@ class Client:
     async def _recv_trailing_metadata(self, event: RecvTrailingMetadata) -> None:
         """Hook that is called after a response is received."""
         if event.status != Status.OK:
-            raise StatelyError.from_trailing_metadata(event)
+            # from None stops the
+            # "During handling of the above exception, another exception occurred"
+            # which happens when raising an exception from a transaction handler.
+            raise StatelyError.from_trailing_metadata(event) from None
 
     def with_allow_stale(self, allow_stale: bool = True) -> Self:
         """
@@ -124,7 +156,7 @@ class Client:
         :return: A clone of the existing client with allow_stale set to the new value.
         :rtype: Self
         """
-        # create a shallow copy since we don't mind if the grpc client,
+        # Create a shallow copy since we don't mind if the grpc client,
         # type mapper or token provider are shared.
         # These are all safe for concurrent use.
         new_client = copy.copy(self)
@@ -159,29 +191,44 @@ class Client:
             return None
         item = next(iter(resp))
         if item.item_type() != item_type.item_type():
-            msg = f"Expected item type {item_type.item_type()}, got {item.item_type()}"
-            raise ValueError(msg)
+            msg = (
+                f"Get returned item type {item.item_type()}. "
+                f"Expected item type {item_type.item_type()}"
+            )
+            raise StatelyError(
+                message=msg,
+                grpc_code=Status.INTERNAL,
+                stately_code="Internal",
+            )
         if not isinstance(item, item_type):
-            msg = f"Error unmarshalling {item_type}, got {type(item)}"
-            raise TypeError(msg)
+            msg = (
+                "Error unmarshalling get response."
+                f"Unmarshaler returned {type(item)} instead of {item_type}"
+            )
+            raise StatelyError(
+                message=msg,
+                grpc_code=Status.INTERNAL,
+                stately_code="Internal",
+            )
         return item
 
     async def get_batch(self, *key_paths: str) -> list[StatelyItem]:
         """
-        get_batch retrieves a set of items by their full key paths. This will return
-        the corresponding items that exist. It will fail if the caller does not
-        have permission to read Items. Use BeginList if you want to retrieve
-        multiple items but don't already know the full key paths of the items you
-        want to get. You can get items of different types in a single getBatch -
-        you will need to use `DatabaseClient.isType` to determine what item type
-        each item is.
+        get_batch retrieves a set of up to 50 items by their full key paths.
+        This will return the corresponding items that exist. It will fail if the
+        caller does not have permission to read Items. Use BeginList if you want
+        to retrieve multiple items but don't already know the full key paths of
+        the items you want to get. You can get items of different types in a
+        single getBatch - you will need to use `DatabaseClient.isType` to
+        determine what item type each item is.
 
-        :param *key_paths: The full key path of each item to load.
+        :param *key_paths: The full key path of each item to load. Max 50 key
+            paths.
         :type *key_paths: str
 
-        :return: The list of Items retrieved from the store.
-            These are returned as generic StatelyItems and should be cast or
-            narrowed to the correct type if you are using typed python.
+        :return: The list of Items retrieved from the store. These are returned
+            as generic StatelyItems and should be cast or narrowed to the
+            correct type if you are using typed python.
         :rtype: list[StatelyItem]
 
         Examples
@@ -197,8 +244,14 @@ class Client:
         resp = await self._db_service.Get(
             pb_get.GetRequest(
                 store_id=self._store_id,
-                gets=[pb_get.GetItem(key_path=key_path) for key_path in key_paths],
+                gets=[
+                    pb_get.GetItem(
+                        key_path=key_path,
+                    )
+                    for key_path in key_paths
+                ],
                 allow_stale=self._allow_stale,
+                schema_version_id=self._schema_version_id,
             ),
         )
         return [self._type_mapper.unmarshal(i) for i in resp.items]
@@ -223,25 +276,40 @@ class Client:
         """
         put_item = next(iter(await self.put_batch(item)))
         if put_item.item_type() != item.item_type():
-            msg = f"Expected item type {item.item_type()}, got {put_item.item_type()}"
-            raise ValueError(msg)
+            msg = (
+                f"Put returned item type {put_item.item_type()}. "
+                f"Expected item type {item.item_type()}"
+            )
+            raise StatelyError(
+                message=msg,
+                grpc_code=Status.INTERNAL,
+                stately_code="Internal",
+            )
         if isinstance(put_item, type(item)):
             return put_item
-        msg = f"Error unmarshalling {put_item}, got {type(item)}"
-        raise TypeError(msg)
+        msg = (
+            "Error unmarshalling put response."
+            f"Unmarshaler returned {type(put_item)} instead of {type(item)}"
+        )
+        raise StatelyError(
+            message=msg,
+            grpc_code=Status.INTERNAL,
+            stately_code="Internal",
+        )
 
     async def put_batch(self, *items: StatelyItem) -> list[StatelyItem]:
         """
-        put_batch adds Items to the Store, or replaces Items if they already exist
-        at that path. This will fail if the caller does not have permission to
-        create Items. Data must be provided as a schema type generated from your defined
-        schema. You can put items of different types in a single putBatch.
+        put_batch adds up to 50 Items to the Store, or replaces Items if they
+        already exist at that path. This will fail if the caller does not have
+        permission to create Items. Data must be provided as a schema type
+        generated from your defined schema. You can put items of different types
+        in a single putBatch.
 
-        :param *items: Items from your generated schema.
+        :param *items: Items from your generated schema. Max 50 items.
         :type *items: StatelyItem
 
-        :return: The items that were put, with any server-generated fields filled in.
-            They are returned in the same order they were provided.
+        :return: The items that were put, with any server-generated fields
+            filled in. They are returned in the same order they were provided.
         :rtype: list[StatelyItem]
 
         Examples
@@ -257,6 +325,7 @@ class Client:
             pb_put.PutRequest(
                 store_id=self._store_id,
                 puts=[pb_put.PutItem(item=i.marshal()) for i in items],
+                schema_version_id=self._schema_version_id,
             ),
         )
 
@@ -264,10 +333,10 @@ class Client:
 
     async def delete(self, *key_paths: str) -> None:
         """
-        delete removes one or more Items from the Store by their full key paths.
+        delete removes up to 50 Items from the Store by their full key paths.
         This will fail if the caller does not have permission to delete Items.
 
-        :param *key_paths: The full key paths of the items.
+        :param *key_paths: The full key paths of the items. Max 50 key paths.
         :type *key_paths: str
 
         :return: None
@@ -284,6 +353,7 @@ class Client:
                 deletes=[
                     pb_delete.DeleteItem(key_path=key_path) for key_path in key_paths
                 ],
+                schema_version_id=self._schema_version_id,
             ),
         )
 
@@ -350,6 +420,7 @@ class Client:
                 key_path_prefix=key_path_prefix,
                 limit=limit,
                 sort_direction=sort_direction,
+                schema_version_id=self._schema_version_id,
             ),
         )
         token_receiver = TokenReceiver(token=None)
@@ -503,10 +574,14 @@ class Client:
                 if item is not None and item.color == "red":
                     item.color = "green"
                     await txn.put(item)
-            assert txn.result is not None
             assert txn.result.committed
             assert len(txn.puts) == 1
 
         """
         stream = self._db_service.Transaction.open()
-        return Transaction(self._store_id, self._type_mapper, stream)
+        return Transaction(
+            self._store_id,
+            self._type_mapper,
+            self._schema_version_id,
+            stream,
+        )

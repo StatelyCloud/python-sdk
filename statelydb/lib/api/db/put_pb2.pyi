@@ -7,12 +7,14 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class PutRequest(_message.Message):
-    __slots__ = ("store_id", "puts")
+    __slots__ = ("store_id", "puts", "schema_version_id")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     PUTS_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     puts: _containers.RepeatedCompositeFieldContainer[PutItem]
-    def __init__(self, store_id: _Optional[int] = ..., puts: _Optional[_Iterable[_Union[PutItem, _Mapping]]] = ...) -> None: ...
+    schema_version_id: int
+    def __init__(self, store_id: _Optional[int] = ..., puts: _Optional[_Iterable[_Union[PutItem, _Mapping]]] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
 
 class PutItem(_message.Message):
     __slots__ = ("item",)

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from typing import TYPE_CHECKING, AsyncContextManager, AsyncGenerator, Literal, TypeVar
 from uuid import UUID
 
 from google.protobuf import empty_pb2 as pb_empty
+from grpclib.const import Status
+from grpclib.exceptions import StreamTerminatedError
 from typing_extensions import Self
 
 from statelydb.lib.api.db import delete_pb2 as pb_delete
@@ -13,6 +17,7 @@ from statelydb.lib.api.db import get_pb2 as pb_get
 from statelydb.lib.api.db import put_pb2 as pb_put
 from statelydb.lib.api.db import transaction_pb2 as pb_transaction
 from statelydb.lib.api.db.list_pb2 import SortDirection
+from statelydb.src.errors import StatelyError
 from statelydb.src.list import ListResult, TokenReceiver, handle_list_response
 from statelydb.src.types import StatelyItem
 
@@ -33,6 +38,17 @@ ResponseType = TypeVar(
     pb_transaction.TransactionListResponse,
     pb_transaction.TransactionFinished,
 )
+
+
+class TransactionFailedError(Exception):
+    """
+    TransactionFailedError is the internal error that is raised when a transaction has
+    failed due to an error raised by the server.
+
+    In these cases all processing should be abandonded and the stream should be closed
+    so that the Client._recv_trailing_metadata() hook can fire and raise the
+    parsed error sent by the server.
+    """
 
 
 class TransactionResult:
@@ -71,12 +87,11 @@ class Transaction(
     This class is returned from the `transaction` method on the Stately client.
     """
 
-    result: TransactionResult | None = None
-
     def __init__(
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,
+        schema_version_id: int,
         stream: Stream[
             pb_transaction.TransactionRequest,
             pb_transaction.TransactionResponse,
@@ -88,17 +103,25 @@ class Transaction(
         :param store_id: The store ID for the transaction.
         :type store_id: StoreID
 
-        :param type_mapper: The type mapper for unmarshalling items.
+        :param type_mapper: The Stately generated schema mapper for converting generic
+            Stately Items into concrete schema types.
         :type type_mapper: BaseTypeMapper
+
+        :param schema_version_id: The schema version ID used to generate the type
+            mapper. This is used to ensure that the schema used by the client matches
+            the schema used by the server.
+        :type schema_version_id: int
 
         :param stream: The bidirectional stream to use for the transaction.
         :type stream: Stream[pb_transaction.TransactionRequest, pb_transaction.TransactionResponse]
 
         """  # noqa: E501 # the line is long because the types are long. it's unavoidable.
+        self.result = TransactionResult()
         self._stream = stream
         self._message_id = 1
         self._store_id = store_id
         self._type_mapper = type_mapper
+        self._schema_version_id = schema_version_id
 
     def _next_message_id(self) -> int:
         self._message_id += 1
@@ -110,7 +133,10 @@ class Transaction(
         await self._stream.send_message(
             pb_transaction.TransactionRequest(
                 message_id=self._next_message_id(),
-                begin=pb_transaction.TransactionBegin(store_id=self._store_id),
+                begin=pb_transaction.TransactionBegin(
+                    store_id=self._store_id,
+                    schema_version_id=self._schema_version_id,
+                ),
             ),
         )
         return self
@@ -122,36 +148,35 @@ class Transaction(
         exc_tb: TracebackType | None,
     ) -> bool:
         """Called when exiting the context manager."""
-        if exc_type is not None:
-            # if there was an exception then abort the transaction
-            try:
-                # wrap the abort in try/finally because if the stream
-                # already errored then this will probably error too
+        # TransactionFailedError indicates that there will be an error
+        # waiting in self._stream.__aexit__ so it's safe to ignore
+        with contextlib.suppress(TransactionFailedError):
+            if exc_type is not None:
+                # if there was an exception then abort the transaction
                 await self._abort()
-            finally:
-                self.result = TransactionResult(puts=[], committed=False)
-        else:
-            # if no error then commit the transaction
-            self.result = await self._commit()
+            else:
+                # if no error then commit the transaction
+                self.result = await self._commit()
 
-        # propagate exc_type etc... into the stream so that it can
-        # run it's own error cleanup if there was an error
-        await self._stream.__aexit__(exc_type, exc_val, exc_tb)
-        # Returning False here will re-raise the exception
-        # I don't think we want our context manager swallowing exceptions.
+        # don't propagate provided exceptions into the stream or else it will
+        # throw them instead of the expected stream error details from the server
+        await self._stream.__aexit__(None, None, None)
+        # Returning False here will re-raise the provided exception
+        # which is desirable if self._stream.__aexit__ didn't throw
         return False
 
     async def get_batch(self, *key_paths: str) -> list[StatelyItem]:
         """
-        get_batch retrieves a set of items by their full key paths. This will return
-        the corresponding items that exist. It will fail if the caller does not
-        have permission to read Items. Use begin_list if you want to retrieve
-        multiple items but don't already know the full key paths of the items you
-        want to get. You can get items of different types in a single get_batch -
-        you will need to use `isinstance` to determine what item
+        get_batch retrieves up to 100 items by their full key paths. This will
+        return the corresponding items that exist. It will fail if the caller
+        does not have permission to read Items. Use begin_list if you want to
+        retrieve multiple items but don't already know the full key paths of the
+        items you want to get. You can get items of different types in a single
+        get_batch - you will need to use `isinstance` to determine what item
         type each item is.
 
-        :param *key_paths: The full key path of each item to load.
+        :param *key_paths: The full key path of each item to load. Max 100 key
+            paths.
         :type *key_paths: str
 
         :return: The items that were loaded.
@@ -207,10 +232,18 @@ class Transaction(
         item = next(iter(resp))
         if item.item_type() != item_type.item_type():
             msg = f"Expected item type {item_type.item_type()}, got {item.item_type()}"
-            raise ValueError(msg)
+            raise StatelyError(
+                stately_code="Internal",
+                message=msg,
+                grpc_code=Status.INTERNAL,
+            )
         if not isinstance(item, item_type):
             msg = f"Error unmarshalling {item_type}, got {type(item)}"
-            raise TypeError(msg)
+            raise StatelyError(
+                stately_code="Internal",
+                message=msg,
+                grpc_code=Status.INTERNAL,
+            )
         return item
 
     async def put(self, item: StatelyItem) -> int | UUID | None:
@@ -232,7 +265,6 @@ class Transaction(
             with txn:
                 lightsaber = Equipment(color="green", jedi="luke", type="lightsaber")
                 lightsaber_id = await txn.put(lightsaber)
-            assert txn.result is not None
             assert txn.result.committed
             assert len(tnx.result.puts) == 1
 
@@ -241,21 +273,22 @@ class Transaction(
 
     async def put_batch(self, *items: StatelyItem) -> list[int | UUID | None]:
         """
-        put_batch adds Items to the Store, or replaces Items if they already exist
-        at that path. This will fail if the caller does not have permission to
-        create Items. Data can be provided as either JSON, or as a proto encoded by
-        a previously agreed upon schema, or by some combination of the two. You can
-        put items of different types in a single put_batch. Puts will not be
-        acknowledged until the transaction is committed - the TransactionResult
-        will contain the updated metadata for each item.
+        put_batch adds up to 50 Items to the Store, or replaces Items if they
+        already exist at that path. This will fail if the caller does not have
+        permission to create Items. Data can be provided as either JSON, or as a
+        proto encoded by a previously agreed upon schema, or by some combination
+        of the two. You can put items of different types in a single put_batch.
+        Puts will not be acknowledged until the transaction is committed - the
+        TransactionResult will contain the updated metadata for each item.
 
-        :param *items: A list of Items from your generated schema.
+        :param *items: A list of Items from your generated schema. Max 50 items.
         :type *items: StatelyItem
 
-        :return: An array of generated IDs for each item, if that
-            item had an ID generated for its "initialValue" field. Otherwise the value
-            is undefined. These are returned in the same order as the input items.
-            This value can be used in subsequent puts to reference newly created items.
+        :return: An array of generated IDs for each item, if that item had an ID
+            generated for its "initialValue" field. Otherwise the value is
+            undefined. These are returned in the same order as the input items.
+            This value can be used in subsequent puts to reference newly created
+            items.
         :rtype: list[int | UUID | None]
 
         Examples
@@ -266,7 +299,6 @@ class Transaction(
                 lightsaber = Equipment(color="green", jedi="luke", type="lightsaber")
                 cloak = Equipment(color="brown", jedi="luke", type="cloak")
                 lightsaber_id, cloak_id = await txn.put_batch(lightsaber, cloak)
-            assert txn.result is not None
             assert txn.result.committed
             assert len(tnx.result.puts) == 2
 
@@ -291,10 +323,11 @@ class Transaction(
 
     async def delete(self, *key_paths: str) -> None:
         """
-        del removes one or more Items from the Store by their full key paths. This
+        del removes up to 50 Items from the Store by their full key paths. This
         will fail if the caller does not have permission to delete Items.
 
-        :param *key_paths: The full key path of each item to delete.
+        :param *key_paths: The full key path of each item to delete. Max 50 key
+            paths.
         :type *key_paths: str
 
         :return: None
@@ -512,20 +545,55 @@ class Transaction(
         This will raise an error if the response does not match the expected
         message ID, or if it cannot be unpacked as expected.
         """
-        resp = await self._stream.recv_message()
+        try:
+            resp = await self._stream.recv_message()
+        except StreamTerminatedError as e:
+            raise StatelyError(
+                stately_code="StreamClosed",
+                grpc_code=Status.FAILED_PRECONDITION,
+                message="Transaction failed due to server stream termination",
+                cause=e,
+            ) from None
+        except asyncio.CancelledError:
+            # if the event loop was cancelled then re-raise the error
+            # to trigger an abort.
+            # first wait for the expected response so that the message_id
+            # order is preserved - otherwise abort will get the response
+            # that was expected in this function
+            _ = await self._stream.recv_message()
+            raise
+
         if resp is None:
-            msg = "Expected a response but got None"
-            raise ValueError(msg)
+            msg = "Received unexpected None on stream."
+            raise TransactionFailedError(msg)
         if resp.message_id != message_id:
-            msg = f"Expected message_id {message_id}, got {resp.message_id}"
-            raise ValueError(msg)
+            msg = f"Transaction expected message_id {message_id}, got {resp.message_id}"
+            raise StatelyError(
+                stately_code="Internal",
+                message=msg,
+                grpc_code=Status.INTERNAL,
+            )
         if resp.WhichOneof("result") != expect_field:
-            msg = f"Expected {expect_field}, got {resp.WhichOneof('result')}"
-            raise ValueError(msg)
+            msg = (
+                f"Transaction expected result type: {expect_field}, "
+                f"got {resp.WhichOneof('result')}"
+            )
+            raise StatelyError(
+                stately_code="Internal",
+                message=msg,
+                grpc_code=Status.INTERNAL,
+            )
         val = getattr(resp, expect_field)
         if not isinstance(val, expect_type):
-            msg = f"Expected {expect_type}, got {type(val)}"
-            raise TypeError(msg)
+            msg = (
+                f"Transaction expected field {expect_field} to have "
+                f"type {expect_type}, got type {type(val)}"
+            )
+            raise StatelyError(
+                stately_code="Internal",
+                message=msg,
+                grpc_code=Status.INTERNAL,
+            )
         return val
 
     async def _request_response(  # noqa: PLR0913

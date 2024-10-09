@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, AsyncGenerator
 
+from grpclib.const import Status
+from grpclib.exceptions import StreamTerminatedError
+
+from statelydb.src.errors import StatelyError
+
 if TYPE_CHECKING:
     from grpclib.client import Stream
 
@@ -103,8 +108,20 @@ async def handle_sync_response(
         msg = "Expected 'finished' to be set but it was never set"
         raise ValueError(msg)  # noqa: TRY301
 
-    # we need to manually close the stream since
-    # we can't use the async context manager as the author of grpclib intended
-    except Exception as e:
-        await stream.__aexit__(type(e), e, e.__traceback__)
+    except StreamTerminatedError as e:
+        raise StatelyError(
+            stately_code="StreamClosed",
+            grpc_code=Status.FAILED_PRECONDITION,
+            message="Sync failed due to server terminated stream",
+            cause=e,
+        ) from None
+    except Exception:
+        # Manually close the stream by invoking __aexit__ as this won't be invoked
+        # automatically.
+        # Don't propagate the exception to the stream, just re-raise and
+        # it will be handled in the context manager thats wrapping this generator
+        # if the server returned an error then __aexit__ will throw an
+        # error which will get caught in the _recv_trailing_metadata hook
+        # and get converted to a StatelyError
+        await stream.__aexit__(None, None, None)
         raise

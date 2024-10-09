@@ -1,6 +1,7 @@
 """The main module for the statelydb package."""
 
-from statelydb.src.auth import AuthTokenProvider
+from statelydb.lib.api.db.list_token_pb2 import ListToken
+from statelydb.src.auth import AuthTokenProvider, init_server_auth
 from statelydb.src.client import Client, SortDirection
 from statelydb.src.errors import StatelyError
 from statelydb.src.keys import key_path
@@ -25,6 +26,7 @@ __all__ = [
     "SortDirection",
     "key_path",
     "ListResult",
+    "ListToken",
     "SyncChangedItem",
     "SyncDeletedItem",
     "SyncReset",
@@ -34,4 +36,5 @@ __all__ = [
     "Transaction",
     "StatelyError",
     "StatelyCode",
+    "init_server_auth",
 ]
