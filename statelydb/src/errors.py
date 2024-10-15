@@ -28,7 +28,7 @@ class StatelyError(Exception):
     def __init__(
         self,
         stately_code: str,
-        grpc_code: Status,
+        code: Status,
         message: str | None = None,
         cause: str | Exception | None = None,
     ) -> None:
@@ -38,8 +38,9 @@ class StatelyError(Exception):
         :param stately_code: The Stately error code. This is either parsed from the gRPC
             response or supplied by the SDK for errors that occur within the SDK.
         :type stately_code: str
-        :param grpc_code: The gRPC status code that was returned by the Stately API.
-        :type grpc_code: Status
+        :param code: The ConnectRPC/gRPC status code that was returned by the Stately
+            API.
+        :type code: Status
         :param message: A human readable message that describes the error.
         :type message: str | None
         :param cause: An optional param containing the cause of the error.
@@ -49,7 +50,7 @@ class StatelyError(Exception):
         super().__init__(message)
 
         self.stately_code = stately_code
-        self.grpc_code = grpc_code
+        self.code = code
         self.message = message
         self.cause = cause
 
@@ -57,7 +58,7 @@ class StatelyError(Exception):
         """Print a human readable represenation of the error."""
         # put it in camel case
         grpc_code_name = "".join(
-            x.capitalize() for x in self.grpc_code.name.lower().split("_")
+            x.capitalize() for x in self.code.name.lower().split("_")
         )
         code_string = f"{grpc_code_name}/{self.stately_code}"
         return (
@@ -90,12 +91,12 @@ class StatelyError(Exception):
             return StatelyError(
                 stately_code=detail.stately_code,
                 message=detail.message,
-                grpc_code=event.status,
+                code=event.status,
                 cause=detail.upstream_cause,
             )
         return StatelyError(
             stately_code="Unknown",
             message=event.status_message,
-            grpc_code=event.status,
+            code=event.status,
             cause=None,
         )

@@ -235,14 +235,14 @@ class Transaction(
             raise StatelyError(
                 stately_code="Internal",
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
             )
         if not isinstance(item, item_type):
             msg = f"Error unmarshalling {item_type}, got {type(item)}"
             raise StatelyError(
                 stately_code="Internal",
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
             )
         return item
 
@@ -550,7 +550,7 @@ class Transaction(
         except StreamTerminatedError as e:
             raise StatelyError(
                 stately_code="StreamClosed",
-                grpc_code=Status.FAILED_PRECONDITION,
+                code=Status.FAILED_PRECONDITION,
                 message="Transaction failed due to server stream termination",
                 cause=e,
             ) from None
@@ -571,7 +571,7 @@ class Transaction(
             raise StatelyError(
                 stately_code="Internal",
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
             )
         if resp.WhichOneof("result") != expect_field:
             msg = (
@@ -581,7 +581,7 @@ class Transaction(
             raise StatelyError(
                 stately_code="Internal",
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
             )
         val = getattr(resp, expect_field)
         if not isinstance(val, expect_type):
@@ -592,7 +592,7 @@ class Transaction(
             raise StatelyError(
                 stately_code="Internal",
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
             )
         return val
 

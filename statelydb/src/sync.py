@@ -111,7 +111,7 @@ async def handle_sync_response(
     except StreamTerminatedError as e:
         raise StatelyError(
             stately_code="StreamClosed",
-            grpc_code=Status.FAILED_PRECONDITION,
+            code=Status.FAILED_PRECONDITION,
             message="Sync failed due to server terminated stream",
             cause=e,
         ) from None

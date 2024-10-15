@@ -58,7 +58,7 @@ def key_id(val: AllKeyTypes) -> str:
         if val < 0:
             raise StatelyError(
                 stately_code="InvalidKeyPath",
-                grpc_code=Status.INVALID_ARGUMENT,
+                code=Status.INVALID_ARGUMENT,
                 message=f"Key IDs must be positive integers, got: {val}",
             )
         return str(val)
@@ -66,7 +66,7 @@ def key_id(val: AllKeyTypes) -> str:
         return f"{encode_bytes(val.bytes)}"
     raise StatelyError(
         stately_code="InvalidKeyPath",
-        grpc_code=Status.INVALID_ARGUMENT,
+        code=Status.INVALID_ARGUMENT,
         message=f"Unsupported key ID type: {type(val)}",
     )
 

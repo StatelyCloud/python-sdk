@@ -197,7 +197,7 @@ class Client:
             )
             raise StatelyError(
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
                 stately_code="Internal",
             )
         if not isinstance(item, item_type):
@@ -207,7 +207,7 @@ class Client:
             )
             raise StatelyError(
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
                 stately_code="Internal",
             )
         return item
@@ -282,7 +282,7 @@ class Client:
             )
             raise StatelyError(
                 message=msg,
-                grpc_code=Status.INTERNAL,
+                code=Status.INTERNAL,
                 stately_code="Internal",
             )
         if isinstance(put_item, type(item)):
@@ -293,7 +293,7 @@ class Client:
         )
         raise StatelyError(
             message=msg,
-            grpc_code=Status.INTERNAL,
+            code=Status.INTERNAL,
             stately_code="Internal",
         )
 

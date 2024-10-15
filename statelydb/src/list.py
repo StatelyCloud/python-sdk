@@ -160,7 +160,7 @@ async def handle_list_response(
         # is already closed
         raise StatelyError(
             stately_code="StreamClosed",
-            grpc_code=Status.FAILED_PRECONDITION,
+            code=Status.FAILED_PRECONDITION,
             message="List failed due to server terminated stream",
             cause=e,
         ) from None

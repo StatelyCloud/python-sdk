@@ -10,7 +10,7 @@ async def test_error_formatter() -> None:
     """Tests that the error formatter correctly formats the error message."""
     error = StatelyError(
         stately_code=StatelyCode.NON_RECOVERABLE_TRANSACTION,
-        grpc_code=Status.NOT_FOUND,
+        code=Status.NOT_FOUND,
         message="test_message",
         cause="test_cause",
     )
