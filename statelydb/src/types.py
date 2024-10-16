@@ -9,6 +9,7 @@ from google.protobuf.message import Message
 from statelydb.lib.api.db.item_pb2 import Item as PBItem
 
 type StoreID = int
+type SchemaVersionID = int
 
 type AllKeyTypes = UUID | str | int | bytes
 AnyKeyType = TypeVar("AnyKeyType", bound=AllKeyTypes)

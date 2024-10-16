@@ -34,7 +34,7 @@ from statelydb.src.types import StatelyItem
 if TYPE_CHECKING:
     from statelydb.lib.api.db.list_token_pb2 import ListToken
     from statelydb.src.sync import SyncResult
-    from statelydb.src.types import BaseTypeMapper, StoreID
+    from statelydb.src.types import BaseTypeMapper, SchemaVersionID, StoreID
 
 T = TypeVar("T", bound=StatelyItem)
 
@@ -46,7 +46,7 @@ class Client:
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,
-        schema_version_id: int,
+        schema_version_id: SchemaVersionID,
         token_provider: AuthTokenProvider | None = None,
         endpoint: str | None = None,
         region: str | None = None,
@@ -65,7 +65,7 @@ class Client:
         :param schema_version_id: The schema version ID used to generate the type
             mapper. This is used to ensure that the schema used by the client matches
             the schema used by the server.
-        :type schema_version_id: int
+        :type schema_version_id: SchemaVersionID
 
         :param token_provider: An optional token provider function.
             Defaults to reading `STATELY_CLIENT_ID` and `STATELY_CLIENT_SECRET` from

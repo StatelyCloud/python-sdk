@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from grpclib.client import Stream
 
     from statelydb.lib.api.db.list_token_pb2 import ListToken
-    from statelydb.src.types import BaseTypeMapper, StoreID
+    from statelydb.src.types import BaseTypeMapper, SchemaVersionID, StoreID
 
 T = TypeVar("T", bound=StatelyItem)
 ResponseField = Literal["get_results", "put_ack", "list_results", "finished"]
@@ -91,7 +91,7 @@ class Transaction(
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,
-        schema_version_id: int,
+        schema_version_id: SchemaVersionID,
         stream: Stream[
             pb_transaction.TransactionRequest,
             pb_transaction.TransactionResponse,
@@ -110,7 +110,7 @@ class Transaction(
         :param schema_version_id: The schema version ID used to generate the type
             mapper. This is used to ensure that the schema used by the client matches
             the schema used by the server.
-        :type schema_version_id: int
+        :type schema_version_id: SchemaVersionID
 
         :param stream: The bidirectional stream to use for the transaction.
         :type stream: Stream[pb_transaction.TransactionRequest, pb_transaction.TransactionResponse]

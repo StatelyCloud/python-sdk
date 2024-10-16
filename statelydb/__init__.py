@@ -15,7 +15,7 @@ from statelydb.src.sync import (
     SyncUpdatedItemKeyOutsideListWindow,
 )
 from statelydb.src.transaction import Transaction, TransactionResult
-from statelydb.src.types import StatelyItem, StatelyObject, StoreID
+from statelydb.src.types import SchemaVersionID, StatelyItem, StatelyObject, StoreID
 
 __all__ = [
     "Client",
@@ -23,6 +23,7 @@ __all__ = [
     "StatelyItem",
     "StatelyObject",
     "StoreID",
+    "SchemaVersionID",
     "SortDirection",
     "key_path",
     "ListResult",
