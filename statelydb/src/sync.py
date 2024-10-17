@@ -58,12 +58,10 @@ class SyncDeletedItem(SyncResult):
 
 class SyncUpdatedItemKeyOutsideListWindow(SyncResult):
     """
-    If the result is a SyncUpdatedItemKeyOutsideListWindow, it means that this
-    item was updated, but now falls outside of the list window. This could be
-    irrelevant, but *if* you already have this key path in the local result set,
-    you should remove it. This can generally be handled the same as
-    SyncDeletedItem, except the item has not actually been deleted so you
-    shouldn't necessarily do cleanup you might do for a deleted item.
+    SyncUpdatedItemKeyOutsideListWindow is a SyncResponse containing items that
+    were updated but Stately cannot tell if they were in the sync window. Treat
+    these as deleted in most cases. For more information see:
+    https://docs.stately.cloud/api/sync.
     """
 
     def __init__(self, key_path: str) -> None:
