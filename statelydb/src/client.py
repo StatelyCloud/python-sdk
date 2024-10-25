@@ -364,30 +364,30 @@ class Client:
         sort_direction: SortDirection = SortDirection.SORT_ASCENDING,
     ) -> ListResult[StatelyItem]:
         """
-        begin_list loads Items that start with a specified key path, subject to
-        additional filtering. The prefix must minimally contain a Group Key (an
-        item type and an item ID). begin_list will return an empty result set if
-        there are no items matching that key prefix. A token is returned from this
-        API that you can then pass to continue_list to expand the result set, or to
-        sync_list to get updates within the result set. This can fail if the caller
-        does not have permission to read Items.
+        begin_list retrieves Items that start with a specified key_path_prefix.
+        The key path prefix must minimally contain a Group Key (a single key
+        segment with a namespace and an ID). BeginList will return an empty
+        result set if there are no items matching that key prefix. This API
+        returns a token that you can pass to ContinueList to expand the result
+        set, or to SyncList to get updates within the result set. This can fail
+        if the caller does not have permission to read Items.
 
         begin_list streams results via an AsyncGenerator, allowing you to handle
         results as they arrive. You can call `collect()` on it to get all the
         results as a list.
 
-        You can list items of different types in a single begin_list, and you can
-        use `isinstance` to handle different item types.
+        You can list items of different types in a single begin_list, and you
+        can use `isinstance` to handle different item types.
 
         :param key_path_prefix: The key path prefix to query for.
         :type key_path_prefix: str
 
-        :param limit: The max number of items to retrieve.
-            If set to 0 then the full set will be returned. Defaults to 0.
+        :param limit: The max number of items to retrieve. If set to 0 then the
+            full set will be returned. Defaults to 0.
         :type limit: int, optional
 
-        :param sort_direction: The direction to sort the results.
-            Defaults to SortDirection.SORT_ASCENDING.
+        :param sort_direction: The direction to sort the results. Defaults to
+            SortDirection.SORT_ASCENDING.
         :type sort_direction: SortDirection, optional
 
         :return: The result generator.
