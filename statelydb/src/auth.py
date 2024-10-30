@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from random import random
 from typing import Any, Awaitable, Callable, Coroutine
 
 import aiohttp
@@ -23,7 +24,6 @@ def init_server_auth(
     client_secret: str | None = None,
     auth_domain: str = "https://oauth.stately.cloud",
     audience: str = "api.stately.cloud",
-    refresh_buffer: int = 5,
 ) -> AuthTokenProvider:
     """
     Create a new authenticator with the provided arguments.
@@ -49,10 +49,6 @@ def init_server_auth(
     :param audience: The audience to authenticate for.
         Defaults to "api.stately.cloud".
     :type audience: str, optional
-
-    :param refresh_buffer: The number of seconds to refresh the token before it expires.
-        Defaults to 5.
-    :type refresh_buffer: int, optional
 
     :return: A callable that asynchronously returns a JWT token string
     :rtype: AuthTokenProvider
@@ -85,6 +81,13 @@ def init_server_auth(
             nonlocal access_token
             access_token = auth_data["access_token"]
             refresh_timeout = auth_data["expires_in"]
+            # Calculate a random multiplier between 0.3 and 0.8 to to apply to
+            # the expiry so that we refresh in the background ahead of
+            # expiration, but avoid multiple processes hammering the service at
+            # the same time. This random generator is fine, it doesn't need to
+            # be cryptographically secure.
+            # ruff: noqa: S311
+            jitter = (random() * 0.5) + 0.3
 
             # set the refresh task
             # this will cause you to see `Task was destroyed but it is pending!`
@@ -92,8 +95,7 @@ def init_server_auth(
             # TODO @stan-stately: implement an abort signal like JS
             # https://app.clickup.com/t/86899vgje
             asyncio.get_event_loop().create_task(
-                # if the refresh timeout is less than the refresh buffer
-                _schedule(_refresh_token, max(0, refresh_timeout - refresh_buffer)),
+                _schedule(_refresh_token, refresh_timeout * jitter),
             )
 
             return auth_data["access_token"]

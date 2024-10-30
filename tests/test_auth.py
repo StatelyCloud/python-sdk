@@ -14,8 +14,6 @@ async def test_token_provider() -> None:
     count = 0
     delay = 0.1
     expiry = 0.1
-    # the timer isn't 100% accurate so we allow a small delta on time based assertions
-    allowed_delta = 0.1
     semaphore = asyncio.Semaphore(1)
     await semaphore.acquire()
 
@@ -44,7 +42,6 @@ async def test_token_provider() -> None:
             client_secret="test_secret",
             audience="test_audience",
             auth_domain="http://localhost",
-            refresh_buffer=0,
         )
 
         start = datetime.now()
@@ -59,16 +56,9 @@ async def test_token_provider() -> None:
 
         # wait for the refresh request to go through
         # which will trigger the semaphore release
-        started_waiting = datetime.now()
         await semaphore.acquire()
         # check that the token was refreshed
         assert await get_token() == "test_token-2"
-        assert (datetime.now() - started_waiting).total_seconds() >= (
-            1 - allowed_delta
-        ) * expiry + delay
-        assert (datetime.now() - started_waiting).total_seconds() <= (
-            1 + allowed_delta
-        ) * expiry + delay
 
         # wait for another request to go through to verify that the refresh task
         # works multiple times.
@@ -96,7 +86,6 @@ def test_token_provider_sync_context() -> None:
             client_secret="test_secret",
             audience="test_audience",
             auth_domain="http://localhost",
-            refresh_buffer=0,
         )
 
         token = asyncio.run(get_token())

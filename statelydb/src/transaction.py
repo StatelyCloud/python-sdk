@@ -115,7 +115,7 @@ class Transaction(
         :param stream: The bidirectional stream to use for the transaction.
         :type stream: Stream[pb_transaction.TransactionRequest, pb_transaction.TransactionResponse]
 
-        """  # noqa: E501 # the line is long because the types are long. it's unavoidable.
+        """
         self.result = TransactionResult()
         self._stream = stream
         self._message_id = 1
