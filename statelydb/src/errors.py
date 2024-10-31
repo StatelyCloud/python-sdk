@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from grpclib.const import Status
+
 from statelydb.lib.api.errors import error_details_pb2 as pb_error
 
 if TYPE_CHECKING:
-    from grpclib.const import Status
     from grpclib.events import RecvTrailingMetadata
 
 
@@ -28,7 +29,7 @@ class StatelyError(Exception):
     def __init__(
         self,
         stately_code: str,
-        code: Status,
+        code: Status | int,
         message: str | None = None,
         cause: str | Exception | None = None,
     ) -> None:
@@ -40,7 +41,7 @@ class StatelyError(Exception):
         :type stately_code: str
         :param code: The ConnectRPC/gRPC status code that was returned by the Stately
             API.
-        :type code: Status
+        :type code: Status | int
         :param message: A human readable message that describes the error.
         :type message: str | None
         :param cause: An optional param containing the cause of the error.
@@ -50,7 +51,13 @@ class StatelyError(Exception):
         super().__init__(message)
 
         self.stately_code = stately_code
-        self.code = code
+        if isinstance(code, int):
+            try:
+                self.code = Status(code)
+            except ValueError:
+                self.code = Status.UNKNOWN
+        else:
+            self.code = code
         self.message = message
         self.cause = cause
 
