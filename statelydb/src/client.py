@@ -475,6 +475,7 @@ class Client:
             pb_continue_list.ContinueListRequest(
                 token_data=token.token_data,
                 direction=pb_continue_list.CONTINUE_LIST_FORWARD,
+                schema_version_id=self._schema_version_id,
             ),
         )
         token_receiver = TokenReceiver(token=None)
@@ -535,6 +536,7 @@ class Client:
         await stream.send_message(
             pb_sync_list.SyncListRequest(
                 token_data=token.token_data,
+                schema_version_id=self._schema_version_id,
             ),
         )
         token_receiver = TokenReceiver(token=None)

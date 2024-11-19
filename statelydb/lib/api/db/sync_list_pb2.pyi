@@ -8,10 +8,12 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class SyncListRequest(_message.Message):
-    __slots__ = ("token_data",)
+    __slots__ = ("token_data", "schema_version_id")
     TOKEN_DATA_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     token_data: bytes
-    def __init__(self, token_data: _Optional[bytes] = ...) -> None: ...
+    schema_version_id: int
+    def __init__(self, token_data: _Optional[bytes] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
 
 class SyncListResponse(_message.Message):
     __slots__ = ("reset", "result", "finished")

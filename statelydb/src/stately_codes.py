@@ -4,6 +4,13 @@
 class StatelyCode:
     """Each code represents a unique failure mode."""
 
+    # CachedSchemaTooOld indicates that schema was recently updated and internal
+    # caches have not yet caught up. If this problem persists, please contact support.
+    #
+    # - Retryable
+    #     This error is immediately retryable.
+    CACHED_SCHEMA_TOO_OLD = "CachedSchemaTooOld"
+
     # ConcurrentModification indicates the current transaction was aborted
     # because of a non-serializable interaction with another transaction was
     # detected, a stale read was detected, or because attempts to resolve an
