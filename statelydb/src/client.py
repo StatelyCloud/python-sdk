@@ -27,6 +27,7 @@ from statelydb.lib.api.db.list_pb2 import SortDirection
 from statelydb.src.auth import AuthTokenProvider, init_server_auth
 from statelydb.src.errors import StatelyError
 from statelydb.src.list import ListResult, TokenReceiver, handle_list_response
+from statelydb.src.put_options import WithPutOptions
 from statelydb.src.sync import handle_sync_response
 from statelydb.src.transaction import Transaction
 from statelydb.src.types import StatelyItem
@@ -37,7 +38,6 @@ if TYPE_CHECKING:
     from statelydb.src.types import BaseTypeMapper, SchemaVersionID, StoreID
 
 T = TypeVar("T", bound=StatelyItem)
-
 
 class Client:
     """Client is a Stately client that interacts with the given store."""
@@ -256,25 +256,36 @@ class Client:
         )
         return [self._type_mapper.unmarshal(i) for i in resp.items]
 
-    async def put(self, item: T) -> T:
+    async def put(self, item: T, must_not_exist: bool=False) -> T:
         """
-        put adds an Item to the Store, or replaces the Item if it already exists at
-        that path. This will fail if the caller does not have permission to create
-        Items.
+        put adds an Item to the Store, or replaces the Item if it already exists
+        at that path. This will fail if the caller does not have permission to
+        create Items.
 
         :param item: An Item from your generated schema.
+        :param must_not_exist: This is a condition that indicates this item must
+            not already exist at any of its key paths. If there is already an
+            item at one of those paths, the Put operation will fail with a
+            ConditionalCheckFailed error. Note that if the item has an
+            `initialValue` field in its key, that initial value will
+            automatically be chosen not to conflict with existing items, so this
+            condition only applies to key paths that do not contain the `initialValue` field.
         :type item: T
 
-        :return: The item that was put, with any server-generated fields filled in.
+        :return: The item that was put, with any server-generated fields filled
+        in.
 
         Examples
         --------
         .. code-block:: python
             lightsaber = Equipment(color="green", jedi="luke", type="lightsaber")
             lightsaber = await client.put(lightsaber)
+            # With options:
+            lightsaber = await client.put(lightsaber, must_not_exist=True)
 
         """
-        put_item = next(iter(await self.put_batch(item)))
+        put_item = next(iter(await self.put_batch(
+            WithPutOptions(item, must_not_exist))))
         if put_item.item_type() != item.item_type():
             msg = (
                 f"Put returned item type {put_item.item_type()}. "
@@ -297,7 +308,9 @@ class Client:
             stately_code="Internal",
         )
 
-    async def put_batch(self, *items: StatelyItem) -> list[StatelyItem]:
+    async def put_batch(
+            self, *items: StatelyItem | WithPutOptions
+        ) -> list[StatelyItem]:
         """
         put_batch adds up to 50 Items to the Store, or replaces Items if they
         already exist at that path. This will fail if the caller does not have
@@ -319,12 +332,23 @@ class Client:
                 Equipment(color="green", jedi="luke", type="lightsaber"),
                 Equipment(color="brown", jedi="luke", type="cloak"),
             )
+            # With options:
+            items = await client.put_batch(
+                WithPutOptions(item=item, must_not_exist=True),
+                cloak,
+            )
 
         """
+        puts = [(pb_put.PutItem(
+                    item=i.item.marshal(),
+                    must_not_exist=i.must_not_exist
+                ) if isinstance(i, WithPutOptions) else pb_put.PutItem(
+                    item=i.marshal()))
+                for i in items]
         resp = await self._db_service.Put(
             pb_put.PutRequest(
                 store_id=self._store_id,
-                puts=[pb_put.PutItem(item=i.marshal()) for i in items],
+                puts=puts,
                 schema_version_id=self._schema_version_id,
             ),
         )

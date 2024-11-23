@@ -6,6 +6,7 @@ from statelydb.src.client import Client, SortDirection
 from statelydb.src.errors import StatelyError
 from statelydb.src.keys import key_path
 from statelydb.src.list import ListResult
+from statelydb.src.put_options import WithPutOptions
 from statelydb.src.stately_codes import StatelyCode
 from statelydb.src.sync import (
     SyncChangedItem,
@@ -37,5 +38,6 @@ __all__ = [
     "Transaction",
     "StatelyError",
     "StatelyCode",
+    "WithPutOptions",
     "init_server_auth",
 ]

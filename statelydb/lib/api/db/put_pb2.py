@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from . import item_pb2 as db_dot_item__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x64\x62/put.proto\x12\nstately.db\x1a\rdb/item.proto\"|\n\nPutRequest\x12\x19\n\x08store_id\x18\x01 \x01(\x04R\x07storeId\x12\'\n\x04puts\x18\x02 \x03(\x0b\x32\x13.stately.db.PutItemR\x04puts\x12*\n\x11schema_version_id\x18\x03 \x01(\rR\x0fschemaVersionId\"/\n\x07PutItem\x12$\n\x04item\x18\x01 \x01(\x0b\x32\x10.stately.db.ItemR\x04item\"5\n\x0bPutResponse\x12&\n\x05items\x18\x01 \x03(\x0b\x32\x10.stately.db.ItemR\x05itemsBc\n\x0e\x63om.stately.dbB\x08PutProtoP\x01\xa2\x02\x03SDX\xaa\x02\nStately.Db\xca\x02\nStately\\Db\xe2\x02\x16Stately\\Db\\GPBMetadata\xea\x02\x0bStately::Dbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x64\x62/put.proto\x12\nstately.db\x1a\rdb/item.proto\"|\n\nPutRequest\x12\x19\n\x08store_id\x18\x01 \x01(\x04R\x07storeId\x12\'\n\x04puts\x18\x02 \x03(\x0b\x32\x13.stately.db.PutItemR\x04puts\x12*\n\x11schema_version_id\x18\x03 \x01(\rR\x0fschemaVersionId\"U\n\x07PutItem\x12$\n\x04item\x18\x01 \x01(\x0b\x32\x10.stately.db.ItemR\x04item\x12$\n\x0emust_not_exist\x18\x03 \x01(\x08R\x0cmustNotExist\"5\n\x0bPutResponse\x12&\n\x05items\x18\x01 \x03(\x0b\x32\x10.stately.db.ItemR\x05itemsBc\n\x0e\x63om.stately.dbB\x08PutProtoP\x01\xa2\x02\x03SDX\xaa\x02\nStately.Db\xca\x02\nStately\\Db\xe2\x02\x16Stately\\Db\\GPBMetadata\xea\x02\x0bStately::Dbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,7 +36,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PUTREQUEST']._serialized_start=43
   _globals['_PUTREQUEST']._serialized_end=167
   _globals['_PUTITEM']._serialized_start=169
-  _globals['_PUTITEM']._serialized_end=216
-  _globals['_PUTRESPONSE']._serialized_start=218
-  _globals['_PUTRESPONSE']._serialized_end=271
+  _globals['_PUTITEM']._serialized_end=254
+  _globals['_PUTRESPONSE']._serialized_start=256
+  _globals['_PUTRESPONSE']._serialized_end=309
 # @@protoc_insertion_point(module_scope)
