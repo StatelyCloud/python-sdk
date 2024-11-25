@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Awaitable, Coroutine
+from datetime import datetime, timedelta, timezone
 from random import random
-from typing import Any, Awaitable, Callable, Coroutine
+from typing import Any, Callable
 
 import aiohttp
 
@@ -62,43 +64,58 @@ def init_server_auth(
     # init nonlocal vars containing the initial state
     # these are overridden by the refresh function
     access_token: str | None = None
+    expires_at: datetime | None = None
 
     async def _refresh_token_impl() -> str:
-        async with aiohttp.ClientSession() as session, session.post(
-            f"{auth_domain}/oauth/token",
-            headers={
-                "Content-Type": "application/json",
-            },
-            json={
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "audience": audience,
-                "grant_type": DEFAULT_GRANT_TYPE,
-            },
-        ) as response:
-            auth_data = await response.json()
+        nonlocal access_token, expires_at
 
-            nonlocal access_token
-            access_token = auth_data["access_token"]
-            refresh_timeout = auth_data["expires_in"]
-            # Calculate a random multiplier between 0.3 and 0.8 to to apply to
-            # the expiry so that we refresh in the background ahead of
-            # expiration, but avoid multiple processes hammering the service at
-            # the same time. This random generator is fine, it doesn't need to
-            # be cryptographically secure.
-            # ruff: noqa: S311
-            jitter = (random() * 0.5) + 0.3
+        refreshed = False
+        while access_token is None or not refreshed:
+            try:
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        f"{auth_domain}/oauth/token",
+                        headers={
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "audience": audience,
+                            "grant_type": DEFAULT_GRANT_TYPE,
+                        },
+                    ) as response,
+                ):
+                    auth_data = await response.json()
 
-            # set the refresh task
-            # this will cause you to see `Task was destroyed but it is pending!`
-            # after the tests run
-            # TODO @stan-stately: implement an abort signal like JS
-            # https://app.clickup.com/t/86899vgje
-            asyncio.get_event_loop().create_task(
-                _schedule(_refresh_token, refresh_timeout * jitter),
-            )
+                    access_token = auth_data["access_token"]
+                    expires_in = auth_data["expires_in"]
+                    expires_at = datetime.now(timezone.utc) + timedelta(
+                        seconds=expires_in
+                    )
+                    # Calculate a random multiplier to apply to the expiry so that we refresh
+                    # in the background ahead of expiration, but avoid multiple processes
+                    # hammering the service at the same time.
+                    # This random generator is fine, it doesn't need to
+                    # be cryptographically secure.
+                    # ruff: noqa: S311
+                    jitter = (random() * 0.05) + 0.9
 
-            return auth_data["access_token"]
+                    # set the refresh task
+                    # this will cause you to see `Task was destroyed but it is pending!`
+                    # after the tests run
+                    # TODO @stan-stately: implement an abort signal like JS
+                    # https://app.clickup.com/t/86899vgje
+                    asyncio.get_event_loop().create_task(
+                        _schedule(_refresh_token, expires_in * jitter),
+                    )
+
+                    refreshed = True
+            except Exception:  # noqa: BLE001, PERF203 # want to catch all exceptions here and we want the try/catch inside the loop
+                # wait half a second and retry
+                await asyncio.sleep(0.5)
+        return access_token
 
     # _refresh_token will fetch the most current auth token for usage in Stately APIs.
     # This method is automatically invoked when calling get_token()
@@ -106,15 +123,27 @@ def init_server_auth(
     # It is also periodically invoked to refresh the token before it expires.
     _refresh_token = _dedupe(lambda: asyncio.create_task(_refresh_token_impl()))
 
+    def valid_access_token() -> str | None:
+        nonlocal access_token, expires_at
+        if (
+            access_token is not None
+            and expires_at is not None
+            and datetime.now(
+                timezone.utc,
+            )
+            < expires_at
+        ):
+            return access_token
+        return None
+
     async def get_token() -> str:
-        nonlocal access_token
-        return access_token or await _refresh_token()
+        return valid_access_token() or await _refresh_token()
 
     return get_token
 
 
-async def _schedule(fn: Callable[[], Awaitable[Any]], delay: int) -> None:
-    await asyncio.sleep(delay)
+async def _schedule(fn: Callable[[], Awaitable[Any]], delay_secs: float) -> None:
+    await asyncio.sleep(delay_secs)
     await fn()
 
 

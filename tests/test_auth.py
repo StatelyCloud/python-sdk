@@ -90,3 +90,43 @@ def test_token_provider_sync_context() -> None:
 
         token = asyncio.run(get_token())
         assert token == "test_token"  # noqa: S105
+
+
+async def test_token_provider_refresh_error() -> None:
+    """Tests that the token provider retries the request when it receives an error."""
+    count = 0
+    success = CallbackResult(
+        status=200,
+        method="POST",
+        payload={"access_token": "test_token", "expires_in": 5},
+    )
+    error = CallbackResult(
+        status=500,
+        method="POST",
+    )
+
+    async def make_resp(_url: str, **_kwargs: dict[str, Any]) -> CallbackResult:
+        nonlocal count
+        count += 1
+        # return one error then return success after that
+        if count > 1:
+            return success
+        return error
+
+    with aioresponses() as http_mock:
+        http_mock.post(  # type: ignore[reportUnknownMemberType]
+            "http://localhost/oauth/token",
+            callback=make_resp,
+            repeat=True,
+        )
+
+        get_token = init_server_auth(
+            client_id="test_id",
+            client_secret="test_secret",
+            audience="test_audience",
+            auth_domain="http://localhost",
+        )
+
+        token = await get_token()
+        assert token == "test_token"  # noqa: S105
+        assert count == 2
