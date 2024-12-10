@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "statelydb"
-version = "0.10.1"
+version = "0.11.0"
 description = "Python client for StatelyDB API"
 authors = ["Stately Cloud <support@stately.cloud>"]
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ keywords = ["stately", "statelydb", "statelycloud"]
 python = "^3.12"
 aiohttp = "^3.9.5"
 asyncio = "^3.4.3"
-protobuf = "^5.27.1"
+protobuf = "^5.29.0"
 grpclib = "^0.4.7"
 googleapis-common-protos = "^1.65.0"
 
@@ -38,7 +38,6 @@ build-backend = "poetry.core.masonry.api"
 asyncio_mode = "auto"
 
 [tool.mypy]
-enable_incomplete_feature = ["NewGenericSyntax"]
 exclude = [".venv", "statelydb/lib"]
 
 [tool.pyright]

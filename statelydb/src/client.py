@@ -9,12 +9,8 @@ from typing import (
     Self,
     TypeVar,
 )
-from urllib.parse import urlparse
 
-from grpclib.client import Channel
 from grpclib.const import Status
-from grpclib.encoding.proto import ProtoStatusDetailsCodec
-from grpclib.events import RecvTrailingMetadata, SendRequest, listen
 
 from statelydb.lib.api.db import continue_list_pb2 as pb_continue_list
 from statelydb.lib.api.db import delete_pb2 as pb_delete
@@ -25,6 +21,7 @@ from statelydb.lib.api.db import service_grpc as db
 from statelydb.lib.api.db import sync_list_pb2 as pb_sync_list
 from statelydb.lib.api.db.list_pb2 import SortDirection
 from statelydb.src.auth import AuthTokenProvider, init_server_auth
+from statelydb.src.channel import StatelyChannel
 from statelydb.src.errors import StatelyError
 from statelydb.src.list import ListResult, TokenReceiver, handle_list_response
 from statelydb.src.put_options import WithPutOptions
@@ -39,8 +36,16 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound=StatelyItem)
 
+
 class Client:
     """Client is a Stately client that interacts with the given store."""
+
+    _endpoint: str
+    _token_provider: AuthTokenProvider
+    _store_id: StoreID
+    _schema_version_id: SchemaVersionID
+    _type_mapper: BaseTypeMapper
+    _allow_stale: bool
 
     def __init__(  # noqa: PLR0913
         self,
@@ -84,8 +89,8 @@ class Client:
         :return: A Client for interacting with a Stately store
         :rtype: Client
         """
+        self._endpoint = Client._make_endpoint(endpoint=endpoint, region=region)
         self._token_provider = token_provider or init_server_auth()
-        self._endpoint = Client._make_endpoint(endpoint, region)
         self._store_id = store_id
         self._schema_version_id = schema_version_id
         self._type_mapper = type_mapper
@@ -97,11 +102,27 @@ class Client:
     @cached_property
     def _db_service(self) -> db.DatabaseServiceStub:
         return db.DatabaseServiceStub(
-            self._new_channel(self._endpoint),
+            StatelyChannel(endpoint=self._endpoint).with_auth(
+                token_provider=self._token_provider
+            ),
         )
 
     @staticmethod
     def _make_endpoint(endpoint: str | None = None, region: str | None = None) -> str:
+        """
+        Resolve the Stately API endpoint based on the provided endpoint and region.
+
+        :param endpoint: The Stately API endpoint to connect to.
+            Defaults to "https://api.stately.cloud" if no region is provided.
+        :type endpoint: str, optional
+
+        :param region: The Stately region to connect to.
+            If region is provided and endpoint is not provided then the regional
+            endpoint will be used.
+
+        :return: The resolved Stately API endpoint.
+        :rtype: str
+        """
         if endpoint:
             return endpoint
         if region is None:
@@ -110,38 +131,6 @@ class Client:
         if region.startswith("aws-"):
             region = region.removeprefix("aws-")
         return f"https://{region}.aws.api.stately.cloud"
-
-    def _new_channel(
-        self,
-        endpoint: str,
-    ) -> Channel:
-        """Create a new grpc channel and setup interceptors."""
-        url = urlparse(endpoint)
-        channel = Channel(
-            host=url.hostname,
-            port=443 if url.scheme == "https" else 3000,
-            ssl=url.scheme == "https",
-            status_details_codec=ProtoStatusDetailsCodec(),
-        )
-        # add any listeners.
-        # These are basically grpclib's version of interceptors
-        listen(channel, SendRequest, self._send_request)
-        listen(channel, RecvTrailingMetadata, self._recv_trailing_metadata)
-        return channel
-
-    async def _send_request(self, event: SendRequest) -> None:
-        """Hook that is called before a request is sent."""
-        # grpclib doesn't allow uppercase characters in headers:
-        # https://github.com/vmagamedov/grpclib/blob/62f968a4c84e3f64e6966097574ff0a59969ea9b/grpclib/metadata.py#L113
-        event.metadata["authorization"] = f"Bearer {await self._token_provider()}"
-
-    async def _recv_trailing_metadata(self, event: RecvTrailingMetadata) -> None:
-        """Hook that is called after a response is received."""
-        if event.status != Status.OK:
-            # from None stops the
-            # "During handling of the above exception, another exception occurred"
-            # which happens when raising an exception from a transaction handler.
-            raise StatelyError.from_trailing_metadata(event) from None
 
     def with_allow_stale(self, allow_stale: bool = True) -> Self:
         """
@@ -256,7 +245,7 @@ class Client:
         )
         return [self._type_mapper.unmarshal(i) for i in resp.items]
 
-    async def put(self, item: T, must_not_exist: bool=False) -> T:
+    async def put(self, item: T, must_not_exist: bool = False) -> T:
         """
         put adds an Item to the Store, or replaces the Item if it already exists
         at that path. This will fail if the caller does not have permission to
@@ -284,8 +273,9 @@ class Client:
             lightsaber = await client.put(lightsaber, must_not_exist=True)
 
         """
-        put_item = next(iter(await self.put_batch(
-            WithPutOptions(item, must_not_exist))))
+        put_item = next(
+            iter(await self.put_batch(WithPutOptions(item, must_not_exist)))
+        )
         if put_item.item_type() != item.item_type():
             msg = (
                 f"Put returned item type {put_item.item_type()}. "
@@ -309,8 +299,8 @@ class Client:
         )
 
     async def put_batch(
-            self, *items: StatelyItem | WithPutOptions
-        ) -> list[StatelyItem]:
+        self, *items: StatelyItem | WithPutOptions
+    ) -> list[StatelyItem]:
         """
         put_batch adds up to 50 Items to the Store, or replaces Items if they
         already exist at that path. This will fail if the caller does not have
@@ -339,12 +329,14 @@ class Client:
             )
 
         """
-        puts = [(pb_put.PutItem(
-                    item=i.item.marshal(),
-                    must_not_exist=i.must_not_exist
-                ) if isinstance(i, WithPutOptions) else pb_put.PutItem(
-                    item=i.marshal()))
-                for i in items]
+        puts = [
+            (
+                pb_put.PutItem(item=i.item.marshal(), must_not_exist=i.must_not_exist)
+                if isinstance(i, WithPutOptions)
+                else pb_put.PutItem(item=i.marshal())
+            )
+            for i in items
+        ]
         resp = await self._db_service.Put(
             pb_put.PutRequest(
                 store_id=self._store_id,
