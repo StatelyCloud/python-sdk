@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from typing import TYPE_CHECKING, AsyncContextManager, AsyncGenerator, Literal, TypeVar
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Literal, TypeVar
 from uuid import UUID
 
 from google.protobuf import empty_pb2 as pb_empty
@@ -23,6 +24,7 @@ from statelydb.src.put_options import WithPutOptions
 from statelydb.src.types import StatelyItem
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
     from types import TracebackType
 
     from grpclib.client import Stream
@@ -81,7 +83,7 @@ class TransactionResult:
 
 
 class Transaction(
-    AsyncContextManager["Transaction"],
+    AbstractAsyncContextManager["Transaction"],
 ):
     """
     The transaction context manager.
@@ -247,9 +249,9 @@ class Transaction(
             )
         return item
 
-    async def put(self,
-                  item: StatelyItem,
-                  must_not_exist: bool=False) -> int | UUID | None:
+    async def put(
+        self, item: StatelyItem, must_not_exist: bool = False
+    ) -> int | UUID | None:
         """
         put adds an Item to the Store, or replaces the Item if it already exists at
         that path. This will fail if the caller does not have permission to create
@@ -279,12 +281,11 @@ class Transaction(
             assert len(tnx.result.puts) == 1
 
         """
-        return next(iter(await self.put_batch(
-            WithPutOptions(item, must_not_exist))))
+        return next(iter(await self.put_batch(WithPutOptions(item, must_not_exist))))
 
-    async def put_batch(self,
-                        *items: StatelyItem | WithPutOptions
-                        ) -> list[int | UUID | None]:
+    async def put_batch(
+        self, *items: StatelyItem | WithPutOptions
+    ) -> list[int | UUID | None]:
         """
         put_batch adds up to 50 Items to the Store, or replaces Items if they
         already exist at that path. This will fail if the caller does not have
@@ -316,12 +317,14 @@ class Transaction(
             assert len(tnx.result.puts) == 2
 
         """
-        puts = [(pb_put.PutItem(
-                    item=i.item.marshal(),
-                    must_not_exist=i.must_not_exist
-                ) if isinstance(i, WithPutOptions) else pb_put.PutItem(
-                    item=i.marshal()))
-                for i in items]
+        puts = [
+            (
+                pb_put.PutItem(item=i.item.marshal(), must_not_exist=i.must_not_exist)
+                if isinstance(i, WithPutOptions)
+                else pb_put.PutItem(item=i.marshal())
+            )
+            for i in items
+        ]
         resp = await self._request_response(
             put_items=pb_transaction.TransactionPut(
                 puts=puts,
