@@ -95,9 +95,13 @@ class StatelyError(Exception):
             )
         ):
             detail = event.status_details[0]  # type: ignore[reportUnknownMemberType]
+            message = detail.message
+            rid = event.metadata.get("st-rid")
+            if rid:
+                message += f" (Request ID: {str(rid, 'utf-8') if isinstance(rid, bytes) else rid})"
             return StatelyError(
                 stately_code=detail.stately_code,
-                message=detail.message,
+                message=message,
                 code=event.status,
                 cause=detail.upstream_cause,
             )

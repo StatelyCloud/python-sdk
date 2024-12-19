@@ -245,7 +245,12 @@ class Client:
         )
         return [self._type_mapper.unmarshal(i) for i in resp.items]
 
-    async def put(self, item: T, must_not_exist: bool = False) -> T:
+    async def put(
+        self,
+        item: T,
+        must_not_exist: bool = False,
+        overwrite_metadata_timestamps: bool = False,
+    ) -> T:
         """
         put adds an Item to the Store, or replaces the Item if it already exists
         at that path. This will fail if the caller does not have permission to
@@ -258,7 +263,14 @@ class Client:
             ConditionalCheckFailed error. Note that if the item has an
             `initialValue` field in its key, that initial value will
             automatically be chosen not to conflict with existing items, so this
-            condition only applies to key paths that do not contain the `initialValue` field.
+            condition only applies to key paths that do not contain the
+            `initialValue` field.
+        :param overwrite_metadata_timestamps: If set to True, the server will
+            set the `createdAtTime` and/or `lastModifiedAtTime` fields based on
+            the current values in this item (assuming you've mapped them to a
+            field using `fromMetadata`). Without this, those fields are always
+            ignored and the server sets them to the appropriate times. This
+            option can be useful when migrating data from another system.
         :type item: T
 
         :return: The item that was put, with any server-generated fields filled
@@ -274,7 +286,11 @@ class Client:
 
         """
         put_item = next(
-            iter(await self.put_batch(WithPutOptions(item, must_not_exist)))
+            iter(
+                await self.put_batch(
+                    WithPutOptions(item, must_not_exist, overwrite_metadata_timestamps)
+                )
+            )
         )
         if put_item.item_type() != item.item_type():
             msg = (
@@ -331,7 +347,11 @@ class Client:
         """
         puts = [
             (
-                pb_put.PutItem(item=i.item.marshal(), must_not_exist=i.must_not_exist)
+                pb_put.PutItem(
+                    item=i.item.marshal(),
+                    must_not_exist=i.must_not_exist,
+                    overwrite_metadata_timestamps=i.overwrite_metadata_timestamps,
+                )
                 if isinstance(i, WithPutOptions)
                 else pb_put.PutItem(item=i.marshal())
             )

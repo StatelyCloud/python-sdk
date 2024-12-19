@@ -18,3 +18,9 @@ class WithPutOptions:
     will automatically be chosen not to conflict with existing items, so this
     condition only applies to key paths that do not contain the `initialValue`
     field."""
+    overwrite_metadata_timestamps: bool
+    """If set to true, the server will set the `createdAtTime` and/or
+    `lastModifiedAtTime` fields based on the current values in this item
+    (assuming you've mapped them to a field using `fromMetadata`). Without this,
+    those fields are always ignored and the server sets them to the appropriate
+    times. This option can be useful when migrating data from another system."""
