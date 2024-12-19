@@ -520,7 +520,7 @@ class Transaction(
             expect_type=pb_transaction.TransactionFinished,
         )
 
-    async def _request_only(  # noqa: PLR0913
+    async def _request_only(
         self,
         begin: pb_transaction.TransactionBegin | None = None,
         get_items: pb_transaction.TransactionGet | None = None,
@@ -618,7 +618,7 @@ class Transaction(
             )
         return val
 
-    async def _request_response(  # noqa: PLR0913
+    async def _request_response(
         self,
         expect_field: ResponseField,
         expect_type: type[ResponseType],

@@ -47,7 +47,7 @@ class Client:
     _type_mapper: BaseTypeMapper
     _allow_stale: bool
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,

@@ -12,11 +12,8 @@ import os
 from collections.abc import Awaitable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from http import HTTPStatus
 from random import random
 from typing import Any, Callable
-
-import aiohttp
 
 from statelydb.lib.api.auth import get_auth_token_pb2
 from statelydb.lib.api.auth import service_grpc as auth
@@ -24,6 +21,15 @@ from statelydb.src.channel import StatelyChannel
 from statelydb.src.errors import StatelyError, Status
 
 type AuthTokenProvider = Callable[[], Coroutine[Any, Any, str]]
+
+NON_RETRYABLE_ERRORS = [
+    Status.UNAUTHENTICATED,
+    Status.PERMISSION_DENIED,
+    Status.NOT_FOUND,
+    Status.UNIMPLEMENTED,
+    Status.INVALID_ARGUMENT,
+]
+RETRY_ATTEMPTS = 10
 
 
 @dataclass
@@ -47,15 +53,11 @@ class TokenState:
 # auth0 or stately
 type TokenFetcher = Callable[[], Coroutine[Any, Any, TokenResult]]
 
-DEFAULT_GRANT_TYPE = "client_credentials"
-
 
 def init_server_auth(
     access_key: str | None = None,
-    client_id: str | None = None,
-    client_secret: str | None = None,
-    origin: str | None = None,
-    audience: str = "api.stately.cloud",
+    origin: str | None = "https://api.stately.cloud",
+    base_retry_backoff_secs: float = 1.0,
 ) -> AuthTokenProvider:
     """
     Create a new authenticator with the provided arguments.
@@ -67,26 +69,14 @@ def init_server_auth(
         Defaults to os.getenv("STATELY_ACCESS_KEY").
     :type access_key: str, optional
 
-    :param client_id: The customer client ID to use for authentication.
-        This will be provided to you by a Stately admin.
-        Defaults to os.getenv("STATELY_CLIENT_ID").
-        DEPRECATED: use access_key instead.
-    :type client_id: str, optional
-
-    :param client_secret: The customer client secret to use for authentication.
-        This will be provided to you by a Stately admin.
-        Defaults to os.getenv("STATELY_CLIENT_SECRET").
-        DEPRECATED: use access_key instead.
-    :type client_secret: str, optional
-
     :param origin: The origin to use for authentication.
-        Defaults to "https://oauth.stately.cloud" if client_id and client_secret are passed,
-        or "https://api.stately.cloud" if access_key is passed.
+        Defaults to "https://api.stately.cloud".
     :type origin: str, optional
 
-    :param audience: The audience to authenticate for.
-        Defaults to "api.stately.cloud".
-    :type audience: str, optional
+
+    :param base_retry_backoff_secs: The base backoff time in seconds for retrying failed requests.
+        Defaults to 1.0.
+    :type base_retry_backoff_secs: float, optional
 
     :return: A callable that asynchronously returns an access token string
     :rtype: AuthTokenProvider
@@ -95,24 +85,21 @@ def init_server_auth(
     # args are evaluated at definition time
     # so we can't put these in the definition
     access_key = access_key or os.getenv("STATELY_ACCESS_KEY")
-    client_id = client_id or os.getenv("STATELY_CLIENT_ID")
-    client_secret = client_secret or os.getenv("STATELY_CLIENT_SECRET")
 
     token_fetcher: TokenFetcher | None = None
     if access_key is not None:
         origin = origin or "https://api.stately.cloud"
-        token_fetcher = make_fetch_stately_access_token(access_key, origin)
-    elif client_id is not None and client_secret is not None:
-        origin = origin or "https://oauth.stately.cloud"
-        token_fetcher = make_fetch_auth0(client_id, client_secret, origin, audience)
+        token_fetcher = make_fetch_stately_access_token(
+            access_key, origin, base_retry_backoff_secs
+        )
+
     else:
         raise StatelyError(
             stately_code="Unauthenticated",
             code=Status.UNAUTHENTICATED,
             message=(
-                "unable to find client credentials in STATELY_ACCESS_KEY or STATELY_CLIENT_ID and"
-                " STATELY_CLIENT_SECRET environment variables. Either pass your credentials in "
-                "explicitly or set these environment variables"
+                "Unable to find an access key in the STATELY_ACCESS_KEY environment variable."
+                "Either pass your access key in the options when creating a client or set this environment variable."
             ),
         )
 
@@ -123,40 +110,38 @@ def init_server_auth(
     async def _refresh_token_impl() -> str:
         nonlocal token_state
 
-        refreshed = False
-        # TODO @stan-stately: Swap this loop out for error handling with
-        # retries inside the token_fetcher
-        # https://app.clickup.com/t/868b8rwjk
-        while token_state is None or not refreshed:
-            try:
-                token_result = await token_fetcher()  # type: ignore[misc] # mypy can't work out that this can't be None
-                expires_at = datetime.now(timezone.utc) + timedelta(
-                    seconds=token_result.expires_in_secs
-                )
-                token_state = TokenState(token_result.token, expires_at)
-                # Calculate a random multiplier to apply to the expiry so that we refresh
-                # in the background ahead of expiration, but avoid multiple processes
-                # hammering the service at the same time.
-                # This random generator is fine, it doesn't need to
-                # be cryptographically secure.
-                # ruff: noqa: S311
-                jitter = (random() * 0.05) + 0.9
+        token_result = await token_fetcher()  # type: ignore[misc] # mypy can't work out that this can't be None
+        new_expires_in_secs = token_result.expires_in_secs
+        new_expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=new_expires_in_secs
+        )
 
-                # set the refresh task
-                # this will cause you to see `Task was destroyed but it is pending!`
-                # after the tests run
-                # TODO @stan-stately: implement an abort signal like JS
-                # https://app.clickup.com/t/86899vgje
-                asyncio.get_event_loop().create_task(
-                    _schedule(_refresh_token, token_result.expires_in_secs * jitter),
-                )
+        # only update the token state if the new expiry is later than the current one
+        if token_state is None or new_expires_at > token_state.expires_at:
+            token_state = TokenState(token_result.token, new_expires_at)
+        else:
+            # otherwise use the existing expiry time for scheduling the refresh
+            new_expires_in_secs = int(
+                (token_state.expires_at - datetime.now(timezone.utc)).total_seconds()
+            )
 
-                refreshed = True
-            except Exception:  # noqa: BLE001, PERF203
-                # wait half a second and retry
-                # TODO @stan-stately: Swap this to exponential backoff
-                # https://app.clickup.com/t/868b8rwjk
-                await asyncio.sleep(0.5)
+        # Calculate a random multiplier to apply to the expiry so that we refresh
+        # in the background ahead of expiration, but avoid multiple processes
+        # hammering the service at the same time.
+        # This random generator is fine, it doesn't need to
+        # be cryptographically secure.
+        # ruff: noqa: S311
+        jitter = (random() * 0.05) + 0.9
+
+        # set the refresh task
+        # this will cause you to see `Task was destroyed but it is pending!`
+        # after the tests run
+        # TODO @stan-stately: implement an abort signal like JS
+        # https://app.clickup.com/t/86899vgje
+        asyncio.get_event_loop().create_task(
+            _schedule(_refresh_token, new_expires_in_secs * jitter),
+        )
+
         return token_state.token
 
     # _refresh_token will fetch the most current auth token for usage in Stately APIs.
@@ -208,46 +193,9 @@ def _dedupe(
     return _run
 
 
-def make_fetch_auth0(
-    client_id: str, client_secret: str, origin: str, audience: str
+def make_fetch_stately_access_token(
+    access_key: str, origin: str, base_retry_backoff_secs: float
 ) -> TokenFetcher:
-    """make_fetch_auth0 creates a fetcher function that fetches an auth0 token using client_id and client_secret."""
-
-    async def fetch_auth0() -> TokenResult:
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                f"{origin}/oauth/token",
-                headers={
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "audience": audience,
-                    "granttype": DEFAULT_GRANT_TYPE,
-                },
-            ) as response,
-        ):
-            if response.status != HTTPStatus.OK:
-                raise StatelyError(
-                    stately_code="Unauthenticated",
-                    code=Status.UNAUTHENTICATED,
-                    message=(
-                        f"Failed to fetch auth token from {origin}. "
-                        f"Status: {response.status}."
-                    ),
-                )
-            auth_data = await response.json()
-            return TokenResult(
-                token=auth_data["access_token"],
-                expires_in_secs=auth_data["expires_in"],
-            )
-
-    return fetch_auth0
-
-
-def make_fetch_stately_access_token(access_key: str, origin: str) -> TokenFetcher:
     """make_fetch_stately_access_token creates a fetcher function that fetches a Stately token using access_key."""
     auth_service: auth.AuthServiceStub | None = None
 
@@ -260,12 +208,48 @@ def make_fetch_stately_access_token(access_key: str, origin: str) -> TokenFetche
             auth_service = auth.AuthServiceStub(
                 StatelyChannel(endpoint=origin),
             )
-        resp = await auth_service.GetAuthToken(
-            get_auth_token_pb2.GetAuthTokenRequest(access_key=access_key)
-        )
-        return TokenResult(
-            token=resp.auth_token,
-            expires_in_secs=resp.expires_in_s,
+
+        for i in range(RETRY_ATTEMPTS):
+            try:
+                resp = await auth_service.GetAuthToken(
+                    get_auth_token_pb2.GetAuthTokenRequest(access_key=access_key)
+                )
+                return TokenResult(
+                    token=resp.auth_token,
+                    expires_in_secs=resp.expires_in_s,
+                )
+            except StatelyError as e:  # noqa: PERF203
+                if e.code in NON_RETRYABLE_ERRORS or i == RETRY_ATTEMPTS - 1:
+                    raise
+                await asyncio.sleep(backoff(i, base_retry_backoff_secs))
+                continue
+        # You should never ever hit this. The loop should be raising the exception from the API
+        # in the above error handler. If you do hit this, it means there is a programming error
+        raise StatelyError(
+            stately_code="Internal",
+            code=Status.INTERNAL,
+            message="Exceeded max retry attempts but did not correctly propagate exception on final attempt.",
         )
 
     return fetch_stately_access_token
+
+
+def backoff(attempt: int, base_retry_backoff_secs: float) -> float:
+    """
+    Calculate the duration to wait before retrying a request.
+
+    :param attempt: The number of attempts that have been made so far.
+    :type attempt: int
+
+    :param base_retry_backoff_secs: The base backoff time in seconds.
+    :type base_retry_backoff_secs: float
+
+    :return: The duration to wait before retrying the request.
+    :rtype: float
+
+    """
+    # Double the base backoff time per attempt, starting with 1
+    exp = 2**attempt
+    # Add a full jitter to the backoff time, from no wait to 100% of the exponential backoff.
+    jitter = random()
+    return exp * jitter * base_retry_backoff_secs
