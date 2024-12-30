@@ -1,12 +1,15 @@
 """Shared types for the Stately Cloud SDK."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID
 
-from google.protobuf.message import Message
+if TYPE_CHECKING:
+    from google.protobuf.message import Message
 
-from statelydb.lib.api.db.item_pb2 import Item as PBItem
+    from statelydb.lib.api.db.item_pb2 import Item as PBItem
 
 type StoreID = int
 type SchemaVersionID = int
@@ -16,34 +19,28 @@ AnyKeyType = TypeVar("AnyKeyType", bound=AllKeyTypes)
 
 
 class StatelyObject(ABC):
-    """
-    All generated object types must implement the StatelyObject interface
-    which allows for serialization and deserialization to and from protobuf.
-    """
+    """All generated object types must implement the StatelyObject interface."""
 
     @abstractmethod
     def marshal(self) -> Message:
-        """Marshal the StatelyObject to it's corresponding proto message."""
+        """Marshal the StatelyObject to its corresponding proto message."""
 
     @staticmethod
     @abstractmethod
-    def unmarshal(proto_bytes: bytes) -> "StatelyObject":
-        """Unmarshal proto bytes into their corresponding StatelyObject."""
+    def unmarshal(proto_bytes: bytes | Message) -> StatelyObject:
+        """Unmarshal proto bytes or message into their corresponding StatelyObject."""
 
 
 class StatelyItem(ABC):
-    """
-    All generated item types must implement the StatelyItem interface
-    which allows for serialization and deserialization to and from protobuf.
-    """
+    """All generated item types must implement the StatelyItem interface."""
 
     @abstractmethod
     def marshal(self) -> PBItem:
-        """Marshal the StatelyItem to it's corresponding proto message."""
+        """Marshal the StatelyItem to a protobuf Item."""
 
     @staticmethod
     @abstractmethod
-    def unmarshal(proto_bytes: bytes) -> "StatelyItem":
+    def unmarshal(proto_bytes: bytes) -> StatelyItem:
         """Unmarshal proto bytes into their corresponding StatelyItem."""
 
     @staticmethod

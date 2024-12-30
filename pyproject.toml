@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "statelydb"
-version = "0.13.0"
+version = "0.14.0"
 description = "Python client for StatelyDB API"
 authors = ["Stately Cloud <support@stately.cloud>"]
 license = "Apache-2.0"
