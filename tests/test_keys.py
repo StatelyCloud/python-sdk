@@ -12,6 +12,7 @@ from statelydb.src.keys import key_id, key_path
 def test_key_path__single_level_paths() -> None:
     assert key_path("/foo-{id}", id="bar") == "/foo-bar"
     assert key_path("/foo-{id}", id="1234") == "/foo-1234"
+    assert key_path("/foo-{id}", id="1234/abc") == "/foo-1234%/abc"
     assert key_path("/foo-{id}", id=1234) == "/foo-1234"
     assert (
         key_path("/foo-{id}", id=UUID("f4a8a24a-129d-411f-91d2-6d19d0eaa096"))
@@ -38,6 +39,7 @@ def test_key_id__uuid() -> None:
 
 def test_key_id__string() -> None:
     assert key_id("batman") == "batman"
+    assert key_id("batman/123") == "batman%/123"
 
 
 def test_key_id__binary() -> None:

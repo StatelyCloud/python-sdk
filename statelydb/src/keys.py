@@ -53,7 +53,7 @@ def key_id(val: AllKeyTypes) -> str:
     if isinstance(val, bytes):
         return f"{encode_bytes(val)}"
     if isinstance(val, str):
-        return val
+        return val.replace("/", "%/")
     if isinstance(val, int):
         if val < 0:
             raise StatelyError(
