@@ -56,7 +56,7 @@ type TokenFetcher = Callable[[], Coroutine[Any, Any, TokenResult]]
 
 def init_server_auth(
     access_key: str | None = None,
-    origin: str | None = "https://api.stately.cloud",
+    endpoint: str | None = "https://api.stately.cloud",
     base_retry_backoff_secs: float = 1.0,
 ) -> AuthTokenProvider:
     """
@@ -69,9 +69,9 @@ def init_server_auth(
         Defaults to os.getenv("STATELY_ACCESS_KEY").
     :type access_key: str, optional
 
-    :param origin: The origin to use for authentication.
+    :param endpoint: The endpoint to use for authentication.
         Defaults to "https://api.stately.cloud".
-    :type origin: str, optional
+    :type endpoint: str, optional
 
 
     :param base_retry_backoff_secs: The base backoff time in seconds for retrying failed requests.
@@ -88,9 +88,9 @@ def init_server_auth(
 
     token_fetcher: TokenFetcher | None = None
     if access_key is not None:
-        origin = origin or "https://api.stately.cloud"
+        endpoint = endpoint or "https://api.stately.cloud"
         token_fetcher = make_fetch_stately_access_token(
-            access_key, origin, base_retry_backoff_secs
+            access_key, endpoint, base_retry_backoff_secs
         )
 
     else:
@@ -194,7 +194,7 @@ def _dedupe(
 
 
 def make_fetch_stately_access_token(
-    access_key: str, origin: str, base_retry_backoff_secs: float
+    access_key: str, endpoint: str, base_retry_backoff_secs: float
 ) -> TokenFetcher:
     """make_fetch_stately_access_token creates a fetcher function that fetches a Stately token using access_key."""
     auth_service: auth.AuthServiceStub | None = None
@@ -206,7 +206,7 @@ def make_fetch_stately_access_token(
         # an async context.
         if auth_service is None:
             auth_service = auth.AuthServiceStub(
-                StatelyChannel(endpoint=origin),
+                StatelyChannel(endpoint=endpoint),
             )
 
         for i in range(RETRY_ATTEMPTS):

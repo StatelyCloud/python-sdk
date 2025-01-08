@@ -41,7 +41,7 @@ class Client:
     """Client is a Stately client that interacts with the given store."""
 
     _endpoint: str
-    _token_provider: AuthTokenProvider
+    _token_provider: AuthTokenProvider | None
     _store_id: StoreID
     _schema_version_id: SchemaVersionID
     _type_mapper: BaseTypeMapper
@@ -55,42 +55,51 @@ class Client:
         token_provider: AuthTokenProvider | None = None,
         endpoint: str | None = None,
         region: str | None = None,
+        no_auth: bool = False,
     ) -> None:
         """
         Construct a new Stately Client.
 
-        :param store_id: The ID of the store to connect to. All client operations will
-            be performed on this store.
+        :param store_id: The ID of the store to connect to. All client
+            operations will be performed on this store.
         :type store_id: StoreID
 
-        :param type_mapper: The Stately generated schema mapper for converting generic
-            Stately Items into concrete schema types.
+        :param type_mapper: The Stately generated schema mapper for converting
+            generic Stately Items into concrete schema types.
         :type type_mapper: BaseTypeMapper
 
-        :param schema_version_id: The schema version ID used to generate the type
-            mapper. This is used to ensure that the schema used by the client matches
-            the schema used by the server.
+        :param schema_version_id: The schema version ID used to generate the
+            type mapper. This is used to ensure that the schema used by the
+            client matches the schema used by the server.
         :type schema_version_id: SchemaVersionID
 
-        :param token_provider: An optional token provider function.
-            Defaults to reading `STATELY_CLIENT_ID` and `STATELY_CLIENT_SECRET` from
-            the environment.
+        :param token_provider: An optional token provider function. Defaults to
+            reading `STATELY_CLIENT_ID` and `STATELY_CLIENT_SECRET` from the
+            environment.
         :type token_provider: AuthTokenProvider, optional
 
-        :param endpoint: The Stately API endpoint to connect to.
-            Defaults to "https://api.stately.cloud" if no region is provided.
+        :param endpoint: The Stately API endpoint to connect to. Defaults to
+            "https://api.stately.cloud" if no region is provided.
         :type endpoint: str, optional
 
-        :param region: The Stately region to connect to.
-            If region is provided and endpoint is not provided then the regional
-            endpoint will be used.
+        :param region: The Stately region to connect to. If region is provided
+            and endpoint is not provided then the regional endpoint will be
+            used.
         :type region: str, optional
+
+        :param no_auth: Indicates that the client should not attempt to get an
+            auth token. This is used when talking to the Stately BYOC Data Plane
+            on localhost.
+        :type no_auth: bool, optional
 
         :return: A Client for interacting with a Stately store
         :rtype: Client
         """
         self._endpoint = Client._make_endpoint(endpoint=endpoint, region=region)
-        self._token_provider = token_provider or init_server_auth()
+        if not no_auth:
+            self._token_provider = token_provider or init_server_auth(
+                endpoint=self._endpoint
+            )
         self._store_id = store_id
         self._schema_version_id = schema_version_id
         self._type_mapper = type_mapper
@@ -101,11 +110,10 @@ class Client:
     # https://github.com/vmagamedov/grpclib/issues/161
     @cached_property
     def _db_service(self) -> db.DatabaseServiceStub:
-        return db.DatabaseServiceStub(
-            StatelyChannel(endpoint=self._endpoint).with_auth(
-                token_provider=self._token_provider
-            ),
-        )
+        channel = StatelyChannel(endpoint=self._endpoint)
+        if self._token_provider:
+            channel = channel.with_auth(token_provider=self._token_provider)
+        return db.DatabaseServiceStub(channel)
 
     @staticmethod
     def _make_endpoint(endpoint: str | None = None, region: str | None = None) -> str:

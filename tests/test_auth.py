@@ -67,7 +67,7 @@ async def test_stately_token_provider_basic_functionalality() -> None:
 
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
         )
 
         token = await get_token()
@@ -107,7 +107,7 @@ async def test_token_provider_refresh() -> None:
 
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
         )
 
         start = datetime.now()
@@ -154,7 +154,7 @@ def test_token_provider_sync_context() -> None:
 
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
         )
         token = loop.run_until_complete(get_token())
         assert token == "test_token"  # noqa: S105
@@ -189,7 +189,7 @@ async def test_token_provider_transient_network_error() -> None:
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
         )
         token = await get_token()
         assert token == "test_token"  # noqa: S105
@@ -217,7 +217,7 @@ async def test_token_provider_permanent_network_error() -> None:
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
         )
 
@@ -255,7 +255,7 @@ async def test_token_provider_non_retryable_codes(
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
         )
 
@@ -287,7 +287,7 @@ async def test_token_provider_retryable_codes(code: Status) -> None:
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
         get_token = init_server_auth(
             access_key="test_key",
-            origin=f"http://127.0.0.1:{port}",
+            endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
         )
 
