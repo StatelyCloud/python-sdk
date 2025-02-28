@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID
 
+from statelydb.src.errors import StatelyError
+
 if TYPE_CHECKING:
     from google.protobuf.message import Message
 
@@ -34,9 +36,45 @@ class StatelyObject(ABC):
 class StatelyItem(ABC):
     """All generated item types must implement the StatelyItem interface."""
 
+    # this is set during unmarshalling to ensure that the key path
+    # is not changed during the lifetime of the object.
+    # You can see the check below in the marshal method.
+    _primary_key_path: str | None = None
+
+    def __init__(self) -> None:
+        """
+        Constructor for StatelyItem. This runs any setup that is common to
+        all StatelyItems.
+        """
+        self._primary_key_path = None
+
+    @abstractmethod
+    def key_path(self) -> str:
+        """Returns the Key Path of the current Item."""
+
     @abstractmethod
     def marshal(self) -> PBItem:
         """Marshal the StatelyItem to a protobuf Item."""
+
+    def check_item_key_reuse(self) -> None:
+        """Verify that the Key Path of the Item has not changed since it was read from StatelyDB."""
+        if (
+            self._primary_key_path is not None
+            and self._primary_key_path != self.key_path()
+        ):
+            msg = (
+                f'{self.item_type()} was read with Key Path: "{self._primary_key_path}" '
+                f'but is being written with Key Path: "{self.key_path()}". '
+                f"If you intend to move your {self.item_type()}, you should delete the "
+                f"original and create a new one. If you intend to create a new {self.item_type()} "
+                f"with the same data, you should create a new instance of {self.item_type()} "
+                "rather than reusing the read result."
+            )
+            raise StatelyError(
+                stately_code="ItemReusedWithDifferentKeyPath",
+                code=3,  # InvalidArgument
+                message=msg,
+            )
 
     @staticmethod
     @abstractmethod

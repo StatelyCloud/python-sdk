@@ -10,10 +10,12 @@ if typing.TYPE_CHECKING:
     import grpclib.server
 
 from . import continue_list_pb2
+from . import continue_scan_pb2
 from . import delete_pb2
 from . import get_pb2
 from . import list_pb2
 from . import put_pb2
+from . import scan_pb2
 from . import scan_root_paths_pb2
 from . import sync_list_pb2
 from . import transaction_pb2
@@ -40,6 +42,14 @@ class DatabaseServiceBase(abc.ABC):
 
     @abc.abstractmethod
     async def ContinueList(self, stream: 'grpclib.server.Stream[continue_list_pb2.ContinueListRequest, list_pb2.ListResponse]') -> None:
+        pass
+
+    @abc.abstractmethod
+    async def BeginScan(self, stream: 'grpclib.server.Stream[scan_pb2.BeginScanRequest, list_pb2.ListResponse]') -> None:
+        pass
+
+    @abc.abstractmethod
+    async def ContinueScan(self, stream: 'grpclib.server.Stream[continue_scan_pb2.ContinueScanRequest, list_pb2.ListResponse]') -> None:
         pass
 
     @abc.abstractmethod
@@ -84,6 +94,18 @@ class DatabaseServiceBase(abc.ABC):
                 self.ContinueList,
                 grpclib.const.Cardinality.UNARY_STREAM,
                 continue_list_pb2.ContinueListRequest,
+                list_pb2.ListResponse,
+            ),
+            '/stately.db.DatabaseService/BeginScan': grpclib.const.Handler(
+                self.BeginScan,
+                grpclib.const.Cardinality.UNARY_STREAM,
+                scan_pb2.BeginScanRequest,
+                list_pb2.ListResponse,
+            ),
+            '/stately.db.DatabaseService/ContinueScan': grpclib.const.Handler(
+                self.ContinueScan,
+                grpclib.const.Cardinality.UNARY_STREAM,
+                continue_scan_pb2.ContinueScanRequest,
                 list_pb2.ListResponse,
             ),
             '/stately.db.DatabaseService/SyncList': grpclib.const.Handler(
@@ -138,6 +160,18 @@ class DatabaseServiceStub:
             channel,
             '/stately.db.DatabaseService/ContinueList',
             continue_list_pb2.ContinueListRequest,
+            list_pb2.ListResponse,
+        )
+        self.BeginScan = grpclib.client.UnaryStreamMethod(
+            channel,
+            '/stately.db.DatabaseService/BeginScan',
+            scan_pb2.BeginScanRequest,
+            list_pb2.ListResponse,
+        )
+        self.ContinueScan = grpclib.client.UnaryStreamMethod(
+            channel,
+            '/stately.db.DatabaseService/ContinueScan',
+            continue_scan_pb2.ContinueScanRequest,
             list_pb2.ListResponse,
         )
         self.SyncList = grpclib.client.UnaryStreamMethod(

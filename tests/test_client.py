@@ -1,6 +1,6 @@
 """Tests for the Client class."""
 
-from statelydb import Client
+from statelydb.src.client import Client
 
 # ruff: noqa: SLF001
 
