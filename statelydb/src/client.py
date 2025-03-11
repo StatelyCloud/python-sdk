@@ -13,10 +13,12 @@ from typing import (
 from grpclib.const import Status
 
 from statelydb.lib.api.db import continue_list_pb2 as pb_continue_list
+from statelydb.lib.api.db import continue_scan_pb2 as pb_continue_scan
 from statelydb.lib.api.db import delete_pb2 as pb_delete
 from statelydb.lib.api.db import get_pb2 as pb_get
 from statelydb.lib.api.db import list_pb2 as pb_list
 from statelydb.lib.api.db import put_pb2 as pb_put
+from statelydb.lib.api.db import scan_pb2 as pb_scan
 from statelydb.lib.api.db import service_grpc as db
 from statelydb.lib.api.db import sync_list_pb2 as pb_sync_list
 from statelydb.lib.api.db.list_pb2 import SortDirection
@@ -555,6 +557,9 @@ class Client:
         You can sync items of different types in a single syncList, and you can use
         `isinstance` to handle different item types.
 
+        WARNING: THIS API CAN BE EXTREMELY EXPENSIVE FOR STORES WITH A LARGE NUMBER
+        OF ITEMS.
+
         :param token: The token from the previous list operation.
         :type token: ListToken
 
@@ -587,6 +592,147 @@ class Client:
         return ListResult(
             token_receiver,
             handle_sync_response(self._type_mapper, token_receiver, stream),
+        )
+
+    async def begin_scan(
+        self,
+        limit: int = 0,
+        item_types: list[type[StatelyItem] | str] | None = None,
+        total_segments: int | None = None,
+        segment_index: int | None = None,
+    ) -> ListResult[StatelyItem]:
+        """
+        begin_scan initiates a scan request which will scan over the entire
+        store and apply the provided filters. This API returns a token that you
+        can pass to continue_scan to paginate through the result set. This can
+        fail if the caller does not have permission to read Items.
+
+        begin_scan streams results via an AsyncGenerator, allowing you to handle
+        results as they arrive. You can call `collect()` on it to get all the
+        results as a list.
+
+        begin_scan can return items of many types, and you can use `isinstance`
+        to handle different item types.
+
+        WARNING: THIS API CAN BE EXTREMELY EXPENSIVE FOR STORES WITH A LARGE NUMBER
+        OF ITEMS.
+
+        :param limit: The max number of items to retrieve. If set to 0 then the
+            full set will be returned. Defaults to 0.
+        :type limit: int, optional
+
+        :param item_types: The item types to filter by. If not provided, all item
+            types will be returned.
+        :type item_types: list[type[T] | str], optional
+
+        :param total_segments: The total number of segments to divide the
+            scan into. Use this when you want to parallelize your operation.
+            Defaults to None.
+        :type total_segments: int, optional
+
+        :param segment_index: The index of the segment to scan.
+            Use this when you want to parallelize your operation.
+            Defaults to None.
+        :type segment_index: int, optional
+
+        :return: The result generator.
+        :rtype: ListResult[StatelyItem]
+
+        Examples
+        --------
+        .. code-block:: python
+            list_resp = await client.begin_scan()
+            async for item in list_resp:
+                if isinstance(item, Equipment):
+                    print(item.color)
+                else:
+                    print(item)
+            token = list_resp.token
+
+        """
+        filters: list[pb_scan.FilterCondition] = []
+        if item_types is not None:
+            filters = [
+                pb_scan.FilterCondition(
+                    item_type=t if isinstance(t, str) else t.__name__
+                )
+                for t in item_types
+            ]
+
+        if total_segments is None != segment_index is None:
+            msg = "total_segments and segment_index must both be set or both be None"
+            raise StatelyError(
+                stately_code="InvalidArgument",
+                message=msg,
+                code=Status.INVALID_ARGUMENT,
+            )
+
+        # grpclib only supports streaming with a context manager but that doesn't work
+        # here because we want to wrap the stream and return it to the customer for them
+        # to read at their leisure.
+        # To get around that we have to manually call __aenter__ and __aexit__ hooks on
+        # the stream.
+        # We call __aenter__ here to open the thing and call __aexit__ at the end of the
+        # response handler to ensure the stream is closed correctly.
+        stream = self._db_service.BeginScan.open()
+        await stream.__aenter__()
+        await stream.send_message(
+            pb_scan.BeginScanRequest(
+                store_id=self._store_id,
+                limit=limit,
+                filter_condition=filters,
+                schema_version_id=self._schema_version_id,
+            ),
+        )
+        token_receiver = TokenReceiver(token=None)
+        return ListResult(
+            token_receiver,
+            handle_list_response(self._type_mapper, token_receiver, stream),
+        )
+
+    async def continue_scan(self, token: ListToken) -> ListResult[StatelyItem]:
+        """
+        continue_scan takes the token from a begin_scan call and returns the next
+        "page" of results based on the original query parameters and pagination
+        options.
+
+        continue_scan streams results via an AsyncGenerator, allowing you to handle
+        results as they arrive. You can call `collect()` on it to get all the
+        results as a list.
+
+        You can scan items of different types in a single continue_scan, and you
+        can use `isinstance` to handle different item types.
+
+        :param token: The token from the previous scan operation.
+        :type token: ListToken
+
+        :return: The result generator.
+        :rtype: ListResult[StatelyItem]
+
+        Examples
+        --------
+        .. code-block:: python
+            list_resp = await client.continue_scan(token)
+            async for item in list_resp:
+                if isinstance(item, Equipment):
+                    print(item.color)
+                else:
+                    print(item)
+            token = list_resp.token
+
+        """
+        stream = self._db_service.ContinueScan.open()
+        await stream.__aenter__()
+        await stream.send_message(
+            pb_continue_scan.ContinueScanRequest(
+                token_data=token.token_data,
+                schema_version_id=self._schema_version_id,
+            ),
+        )
+        token_receiver = TokenReceiver(token=None)
+        return ListResult(
+            token_receiver,
+            handle_list_response(self._type_mapper, token_receiver, stream),
         )
 
     async def transaction(self) -> Transaction:
