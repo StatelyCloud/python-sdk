@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "statelydb"
-version = "0.19.0"
+version = "0.19.1"
 description = "Python client for StatelyDB API"
 authors = ["Stately Cloud <support@stately.cloud>"]
 license = "Apache-2.0"
@@ -12,7 +12,7 @@ keywords = ["stately", "statelydb", "statelycloud"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-aiohttp = "^3.9.5"
+aiohttp = "^3.11.11"
 asyncio = "^3.4.3"
 protobuf = "^5.29.0"
 grpclib = "^0.4.7"
