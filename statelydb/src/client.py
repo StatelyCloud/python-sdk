@@ -618,7 +618,10 @@ class Client:
         OF ITEMS.
 
         :param limit: The max number of items to retrieve. If set to 0 then the
-            full set will be returned. Defaults to 0.
+            first page of results will be returned which may empty because it
+            does not contain items of your selected item types. Be sure to
+            check token.can_continue to see if there are more results to fetch.
+            Defaults to 0.
         :type limit: int, optional
 
         :param item_types: The item types to filter by. If not provided, all item
