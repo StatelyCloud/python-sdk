@@ -17,7 +17,7 @@ SORT_ASCENDING: SortDirection
 SORT_DESCENDING: SortDirection
 
 class BeginListRequest(_message.Message):
-    __slots__ = ("store_id", "key_path_prefix", "limit", "allow_stale", "sort_property", "sort_direction", "schema_version_id")
+    __slots__ = ("store_id", "key_path_prefix", "limit", "allow_stale", "sort_property", "sort_direction", "schema_version_id", "schema_id")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     KEY_PATH_PREFIX_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
@@ -25,6 +25,7 @@ class BeginListRequest(_message.Message):
     SORT_PROPERTY_FIELD_NUMBER: _ClassVar[int]
     SORT_DIRECTION_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     key_path_prefix: str
     limit: int
@@ -32,7 +33,8 @@ class BeginListRequest(_message.Message):
     sort_property: _item_property_pb2.SortableProperty
     sort_direction: SortDirection
     schema_version_id: int
-    def __init__(self, store_id: _Optional[int] = ..., key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., allow_stale: bool = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[SortDirection, str]] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
+    schema_id: int
+    def __init__(self, store_id: _Optional[int] = ..., key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., allow_stale: bool = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[SortDirection, str]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...
 
 class ListResponse(_message.Message):
     __slots__ = ("result", "finished")

@@ -13,11 +13,13 @@ CONTINUE_LIST_FORWARD: ContinueListDirection
 CONTINUE_LIST_BACKWARD: ContinueListDirection
 
 class ContinueListRequest(_message.Message):
-    __slots__ = ("token_data", "direction", "schema_version_id")
+    __slots__ = ("token_data", "direction", "schema_version_id", "schema_id")
     TOKEN_DATA_FIELD_NUMBER: _ClassVar[int]
     DIRECTION_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
     token_data: bytes
     direction: ContinueListDirection
     schema_version_id: int
-    def __init__(self, token_data: _Optional[bytes] = ..., direction: _Optional[_Union[ContinueListDirection, str]] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
+    schema_id: int
+    def __init__(self, token_data: _Optional[bytes] = ..., direction: _Optional[_Union[ContinueListDirection, str]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...

@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from . import item_pb2 as db_dot_item__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x64\x62/get.proto\x12\nstately.db\x1a\rdb/item.proto\"\xa3\x01\n\nGetRequest\x12\x19\n\x08store_id\x18\x01 \x01(\x04R\x07storeId\x12\'\n\x04gets\x18\x02 \x03(\x0b\x32\x13.stately.db.GetItemR\x04gets\x12\x1f\n\x0b\x61llow_stale\x18\x03 \x01(\x08R\nallowStale\x12*\n\x11schema_version_id\x18\x05 \x01(\rR\x0fschemaVersionIdJ\x04\x08\x04\x10\x05\"$\n\x07GetItem\x12\x19\n\x08key_path\x18\x01 \x01(\tR\x07keyPath\"5\n\x0bGetResponse\x12&\n\x05items\x18\x01 \x03(\x0b\x32\x10.stately.db.ItemR\x05itemsBc\n\x0e\x63om.stately.dbB\x08GetProtoP\x01\xa2\x02\x03SDX\xaa\x02\nStately.Db\xca\x02\nStately\\Db\xe2\x02\x16Stately\\Db\\GPBMetadata\xea\x02\x0bStately::Dbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x64\x62/get.proto\x12\nstately.db\x1a\rdb/item.proto\"\xc0\x01\n\nGetRequest\x12\x19\n\x08store_id\x18\x01 \x01(\x04R\x07storeId\x12\'\n\x04gets\x18\x02 \x03(\x0b\x32\x13.stately.db.GetItemR\x04gets\x12\x1f\n\x0b\x61llow_stale\x18\x03 \x01(\x08R\nallowStale\x12*\n\x11schema_version_id\x18\x05 \x01(\rR\x0fschemaVersionId\x12\x1b\n\tschema_id\x18\x06 \x01(\x04R\x08schemaIdJ\x04\x08\x04\x10\x05\"$\n\x07GetItem\x12\x19\n\x08key_path\x18\x01 \x01(\tR\x07keyPath\"5\n\x0bGetResponse\x12&\n\x05items\x18\x01 \x03(\x0b\x32\x10.stately.db.ItemR\x05itemsBc\n\x0e\x63om.stately.dbB\x08GetProtoP\x01\xa2\x02\x03SDX\xaa\x02\nStately.Db\xca\x02\nStately\\Db\xe2\x02\x16Stately\\Db\\GPBMetadata\xea\x02\x0bStately::Dbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,9 +34,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\016com.stately.dbB\010GetProtoP\001\242\002\003SDX\252\002\nStately.Db\312\002\nStately\\Db\342\002\026Stately\\Db\\GPBMetadata\352\002\013Stately::Db'
   _globals['_GETREQUEST']._serialized_start=44
-  _globals['_GETREQUEST']._serialized_end=207
-  _globals['_GETITEM']._serialized_start=209
-  _globals['_GETITEM']._serialized_end=245
-  _globals['_GETRESPONSE']._serialized_start=247
-  _globals['_GETRESPONSE']._serialized_end=300
+  _globals['_GETREQUEST']._serialized_end=236
+  _globals['_GETITEM']._serialized_start=238
+  _globals['_GETITEM']._serialized_end=274
+  _globals['_GETRESPONSE']._serialized_start=276
+  _globals['_GETRESPONSE']._serialized_end=329
 # @@protoc_insertion_point(module_scope)

@@ -7,16 +7,18 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class GetRequest(_message.Message):
-    __slots__ = ("store_id", "gets", "allow_stale", "schema_version_id")
+    __slots__ = ("store_id", "gets", "allow_stale", "schema_version_id", "schema_id")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     GETS_FIELD_NUMBER: _ClassVar[int]
     ALLOW_STALE_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     gets: _containers.RepeatedCompositeFieldContainer[GetItem]
     allow_stale: bool
     schema_version_id: int
-    def __init__(self, store_id: _Optional[int] = ..., gets: _Optional[_Iterable[_Union[GetItem, _Mapping]]] = ..., allow_stale: bool = ..., schema_version_id: _Optional[int] = ...) -> None: ...
+    schema_id: int
+    def __init__(self, store_id: _Optional[int] = ..., gets: _Optional[_Iterable[_Union[GetItem, _Mapping]]] = ..., allow_stale: bool = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...
 
 class GetItem(_message.Message):
     __slots__ = ("key_path",)

@@ -27,7 +27,7 @@ from . import item_property_pb2 as db_dot_item__property__pb2
 from . import list_token_pb2 as db_dot_list__token__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rdb/list.proto\x12\nstately.db\x1a\rdb/item.proto\x1a\x16\x64\x62/item_property.proto\x1a\x13\x64\x62/list_token.proto\"\xbd\x02\n\x10\x42\x65ginListRequest\x12\x19\n\x08store_id\x18\x01 \x01(\x04R\x07storeId\x12&\n\x0fkey_path_prefix\x18\x02 \x01(\tR\rkeyPathPrefix\x12\x14\n\x05limit\x18\x03 \x01(\rR\x05limit\x12\x1f\n\x0b\x61llow_stale\x18\x04 \x01(\x08R\nallowStale\x12\x41\n\rsort_property\x18\x05 \x01(\x0e\x32\x1c.stately.db.SortablePropertyR\x0csortProperty\x12@\n\x0esort_direction\x18\x06 \x01(\x0e\x32\x19.stately.db.SortDirectionR\rsortDirection\x12*\n\x11schema_version_id\x18\x07 \x01(\rR\x0fschemaVersionId\"\x8b\x01\n\x0cListResponse\x12\x37\n\x06result\x18\x01 \x01(\x0b\x32\x1d.stately.db.ListPartialResultH\x00R\x06result\x12\x36\n\x08\x66inished\x18\x02 \x01(\x0b\x32\x18.stately.db.ListFinishedH\x00R\x08\x66inishedB\n\n\x08response\";\n\x11ListPartialResult\x12&\n\x05items\x18\x01 \x03(\x0b\x32\x10.stately.db.ItemR\x05items\";\n\x0cListFinished\x12+\n\x05token\x18\x01 \x01(\x0b\x32\x15.stately.db.ListTokenR\x05token*8\n\rSortDirection\x12\x12\n\x0eSORT_ASCENDING\x10\x00\x12\x13\n\x0fSORT_DESCENDING\x10\x01\x42\x64\n\x0e\x63om.stately.dbB\tListProtoP\x01\xa2\x02\x03SDX\xaa\x02\nStately.Db\xca\x02\nStately\\Db\xe2\x02\x16Stately\\Db\\GPBMetadata\xea\x02\x0bStately::Dbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rdb/list.proto\x12\nstately.db\x1a\rdb/item.proto\x1a\x16\x64\x62/item_property.proto\x1a\x13\x64\x62/list_token.proto\"\xda\x02\n\x10\x42\x65ginListRequest\x12\x19\n\x08store_id\x18\x01 \x01(\x04R\x07storeId\x12&\n\x0fkey_path_prefix\x18\x02 \x01(\tR\rkeyPathPrefix\x12\x14\n\x05limit\x18\x03 \x01(\rR\x05limit\x12\x1f\n\x0b\x61llow_stale\x18\x04 \x01(\x08R\nallowStale\x12\x41\n\rsort_property\x18\x05 \x01(\x0e\x32\x1c.stately.db.SortablePropertyR\x0csortProperty\x12@\n\x0esort_direction\x18\x06 \x01(\x0e\x32\x19.stately.db.SortDirectionR\rsortDirection\x12*\n\x11schema_version_id\x18\x07 \x01(\rR\x0fschemaVersionId\x12\x1b\n\tschema_id\x18\x08 \x01(\x04R\x08schemaId\"\x8b\x01\n\x0cListResponse\x12\x37\n\x06result\x18\x01 \x01(\x0b\x32\x1d.stately.db.ListPartialResultH\x00R\x06result\x12\x36\n\x08\x66inished\x18\x02 \x01(\x0b\x32\x18.stately.db.ListFinishedH\x00R\x08\x66inishedB\n\n\x08response\";\n\x11ListPartialResult\x12&\n\x05items\x18\x01 \x03(\x0b\x32\x10.stately.db.ItemR\x05items\";\n\x0cListFinished\x12+\n\x05token\x18\x01 \x01(\x0b\x32\x15.stately.db.ListTokenR\x05token*8\n\rSortDirection\x12\x12\n\x0eSORT_ASCENDING\x10\x00\x12\x13\n\x0fSORT_DESCENDING\x10\x01\x42\x64\n\x0e\x63om.stately.dbB\tListProtoP\x01\xa2\x02\x03SDX\xaa\x02\nStately.Db\xca\x02\nStately\\Db\xe2\x02\x16Stately\\Db\\GPBMetadata\xea\x02\x0bStately::Dbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,14 +35,14 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'db.list_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\016com.stately.dbB\tListProtoP\001\242\002\003SDX\252\002\nStately.Db\312\002\nStately\\Db\342\002\026Stately\\Db\\GPBMetadata\352\002\013Stately::Db'
-  _globals['_SORTDIRECTION']._serialized_start=673
-  _globals['_SORTDIRECTION']._serialized_end=729
+  _globals['_SORTDIRECTION']._serialized_start=702
+  _globals['_SORTDIRECTION']._serialized_end=758
   _globals['_BEGINLISTREQUEST']._serialized_start=90
-  _globals['_BEGINLISTREQUEST']._serialized_end=407
-  _globals['_LISTRESPONSE']._serialized_start=410
-  _globals['_LISTRESPONSE']._serialized_end=549
-  _globals['_LISTPARTIALRESULT']._serialized_start=551
-  _globals['_LISTPARTIALRESULT']._serialized_end=610
-  _globals['_LISTFINISHED']._serialized_start=612
-  _globals['_LISTFINISHED']._serialized_end=671
+  _globals['_BEGINLISTREQUEST']._serialized_end=436
+  _globals['_LISTRESPONSE']._serialized_start=439
+  _globals['_LISTRESPONSE']._serialized_end=578
+  _globals['_LISTPARTIALRESULT']._serialized_start=580
+  _globals['_LISTPARTIALRESULT']._serialized_end=639
+  _globals['_LISTFINISHED']._serialized_start=641
+  _globals['_LISTFINISHED']._serialized_end=700
 # @@protoc_insertion_point(module_scope)
