@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 type StoreID = int
 type SchemaVersionID = int
+type SchemaID = int
 
 type AllKeyTypes = UUID | str | int | bytes
 AnyKeyType = TypeVar("AnyKeyType", bound=AllKeyTypes)

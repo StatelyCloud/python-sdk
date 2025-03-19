@@ -16,12 +16,19 @@ from statelydb.src.sync import (
     SyncUpdatedItemKeyOutsideListWindow,
 )
 from statelydb.src.transaction import Transaction, TransactionResult
-from statelydb.src.types import SchemaVersionID, StatelyItem, StatelyObject, StoreID
+from statelydb.src.types import (
+    SchemaID,
+    SchemaVersionID,
+    StatelyItem,
+    StatelyObject,
+    StoreID,
+)
 
 __all__ = [
     "AuthTokenProvider",
     "ListResult",
     "ListToken",
+    "SchemaID",
     "SchemaVersionID",
     "SortDirection",
     "StatelyCode",

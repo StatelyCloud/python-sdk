@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from grpclib.client import Stream
 
     from statelydb.lib.api.db.list_token_pb2 import ListToken
-    from statelydb.src.types import BaseTypeMapper, SchemaVersionID, StoreID
+    from statelydb.src.types import BaseTypeMapper, SchemaID, SchemaVersionID, StoreID
 
 T = TypeVar("T", bound=StatelyItem)
 ResponseField = Literal["get_results", "put_ack", "list_results", "finished"]
@@ -94,6 +94,7 @@ class Transaction(
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,
+        schema_id: SchemaID,
         schema_version_id: SchemaVersionID,
         stream: Stream[
             pb_transaction.TransactionRequest,
@@ -110,6 +111,11 @@ class Transaction(
             Stately Items into concrete schema types.
         :type type_mapper: BaseTypeMapper
 
+        :param schema_id: An optional SchemaID used to validate the given
+            schema_id is bound to the store_id. If this is not provided, this
+            check will be skipped.
+        :type schema_id: SchemaID
+
         :param schema_version_id: The schema version ID used to generate the type
             mapper. This is used to ensure that the schema used by the client matches
             the schema used by the server.
@@ -124,6 +130,7 @@ class Transaction(
         self._message_id = 1
         self._store_id = store_id
         self._type_mapper = type_mapper
+        self._schema_id = schema_id
         self._schema_version_id = schema_version_id
 
     def _next_message_id(self) -> int:
@@ -138,6 +145,7 @@ class Transaction(
                 message_id=self._next_message_id(),
                 begin=pb_transaction.TransactionBegin(
                     store_id=self._store_id,
+                    schema_id=self._schema_id,
                     schema_version_id=self._schema_version_id,
                 ),
             ),

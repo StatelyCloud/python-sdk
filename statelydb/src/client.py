@@ -34,7 +34,7 @@ from statelydb.src.types import StatelyItem
 if TYPE_CHECKING:
     from statelydb.lib.api.db.list_token_pb2 import ListToken
     from statelydb.src.sync import SyncResult
-    from statelydb.src.types import BaseTypeMapper, SchemaVersionID, StoreID
+    from statelydb.src.types import BaseTypeMapper, SchemaID, SchemaVersionID, StoreID
 
 T = TypeVar("T", bound=StatelyItem)
 
@@ -46,6 +46,7 @@ class Client:
     _token_provider: AuthTokenProvider | None
     _store_id: StoreID
     _schema_version_id: SchemaVersionID
+    _schema_id: SchemaID
     _type_mapper: BaseTypeMapper
     _allow_stale: bool
 
@@ -53,6 +54,7 @@ class Client:
         self,
         store_id: StoreID,
         type_mapper: BaseTypeMapper,
+        schema_id: SchemaID,
         schema_version_id: SchemaVersionID,
         token_provider: AuthTokenProvider | None = None,
         endpoint: str | None = None,
@@ -69,6 +71,11 @@ class Client:
         :param type_mapper: The Stately generated schema mapper for converting
             generic Stately Items into concrete schema types.
         :type type_mapper: BaseTypeMapper
+
+        :param schema_id: An optional SchemaID used to validate the given
+            schema_id is bound to the store_id. If this is not provided, this
+            check will be skipped.
+        :type schema_id: SchemaID
 
         :param schema_version_id: The schema version ID used to generate the
             type mapper. This is used to ensure that the schema used by the
@@ -103,6 +110,7 @@ class Client:
                 endpoint=self._endpoint
             )
         self._store_id = store_id
+        self._schema_id = schema_id
         self._schema_version_id = schema_version_id
         self._type_mapper = type_mapper
         self._allow_stale = False
@@ -250,6 +258,7 @@ class Client:
                     for key_path in key_paths
                 ],
                 allow_stale=self._allow_stale,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -371,6 +380,7 @@ class Client:
             pb_put.PutRequest(
                 store_id=self._store_id,
                 puts=puts,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -399,6 +409,7 @@ class Client:
                 deletes=[
                     pb_delete.DeleteItem(key_path=key_path) for key_path in key_paths
                 ],
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -466,6 +477,7 @@ class Client:
                 key_path_prefix=key_path_prefix,
                 limit=limit,
                 sort_direction=sort_direction,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -521,6 +533,7 @@ class Client:
             pb_continue_list.ContinueListRequest(
                 token_data=token.token_data,
                 direction=pb_continue_list.CONTINUE_LIST_FORWARD,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -585,6 +598,7 @@ class Client:
         await stream.send_message(
             pb_sync_list.SyncListRequest(
                 token_data=token.token_data,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -684,6 +698,7 @@ class Client:
                 store_id=self._store_id,
                 limit=limit,
                 filter_condition=filters,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -729,6 +744,7 @@ class Client:
         await stream.send_message(
             pb_continue_scan.ContinueScanRequest(
                 token_data=token.token_data,
+                schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
         )
@@ -777,6 +793,7 @@ class Client:
         return Transaction(
             self._store_id,
             self._type_mapper,
+            self._schema_id,
             self._schema_version_id,
             stream,
         )
