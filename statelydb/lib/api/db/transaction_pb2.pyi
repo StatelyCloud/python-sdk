@@ -50,12 +50,14 @@ class TransactionResponse(_message.Message):
     def __init__(self, message_id: _Optional[int] = ..., get_results: _Optional[_Union[TransactionGetResponse, _Mapping]] = ..., put_ack: _Optional[_Union[TransactionPutAck, _Mapping]] = ..., list_results: _Optional[_Union[TransactionListResponse, _Mapping]] = ..., finished: _Optional[_Union[TransactionFinished, _Mapping]] = ...) -> None: ...
 
 class TransactionBegin(_message.Message):
-    __slots__ = ("store_id", "schema_version_id")
+    __slots__ = ("store_id", "schema_version_id", "schema_id")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     schema_version_id: int
-    def __init__(self, store_id: _Optional[int] = ..., schema_version_id: _Optional[int] = ...) -> None: ...
+    schema_id: int
+    def __init__(self, store_id: _Optional[int] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...
 
 class TransactionGet(_message.Message):
     __slots__ = ("gets",)
