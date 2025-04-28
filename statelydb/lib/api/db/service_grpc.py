@@ -16,7 +16,6 @@ from . import get_pb2
 from . import list_pb2
 from . import put_pb2
 from . import scan_pb2
-from . import scan_root_paths_pb2
 from . import sync_list_pb2
 from . import transaction_pb2
 from . import service_pb2
@@ -58,10 +57,6 @@ class DatabaseServiceBase(abc.ABC):
 
     @abc.abstractmethod
     async def Transaction(self, stream: 'grpclib.server.Stream[transaction_pb2.TransactionRequest, transaction_pb2.TransactionResponse]') -> None:
-        pass
-
-    @abc.abstractmethod
-    async def ScanRootPaths(self, stream: 'grpclib.server.Stream[scan_root_paths_pb2.ScanRootPathsRequest, scan_root_paths_pb2.ScanRootPathsResponse]') -> None:
         pass
 
     def __mapping__(self) -> typing.Dict[str, grpclib.const.Handler]:
@@ -119,12 +114,6 @@ class DatabaseServiceBase(abc.ABC):
                 grpclib.const.Cardinality.STREAM_STREAM,
                 transaction_pb2.TransactionRequest,
                 transaction_pb2.TransactionResponse,
-            ),
-            '/stately.db.DatabaseService/ScanRootPaths': grpclib.const.Handler(
-                self.ScanRootPaths,
-                grpclib.const.Cardinality.UNARY_UNARY,
-                scan_root_paths_pb2.ScanRootPathsRequest,
-                scan_root_paths_pb2.ScanRootPathsResponse,
             ),
         }
 
@@ -185,10 +174,4 @@ class DatabaseServiceStub:
             '/stately.db.DatabaseService/Transaction',
             transaction_pb2.TransactionRequest,
             transaction_pb2.TransactionResponse,
-        )
-        self.ScanRootPaths = grpclib.client.UnaryUnaryMethod(
-            channel,
-            '/stately.db.DatabaseService/ScanRootPaths',
-            scan_root_paths_pb2.ScanRootPathsRequest,
-            scan_root_paths_pb2.ScanRootPathsResponse,
         )
