@@ -16,6 +16,7 @@ from statelydb.lib.api.db import continue_list_pb2 as pb_continue_list
 from statelydb.lib.api.db import continue_scan_pb2 as pb_continue_scan
 from statelydb.lib.api.db import delete_pb2 as pb_delete
 from statelydb.lib.api.db import get_pb2 as pb_get
+from statelydb.lib.api.db import list_filters_pb2 as pb_filter_condition
 from statelydb.lib.api.db import list_pb2 as pb_list
 from statelydb.lib.api.db import put_pb2 as pb_put
 from statelydb.lib.api.db import scan_pb2 as pb_scan
@@ -667,10 +668,10 @@ class Client:
             token = list_resp.token
 
         """
-        filters: list[pb_scan.FilterCondition] = []
+        filters: list[pb_filter_condition.FilterCondition] = []
         if item_types is not None:
             filters = [
-                pb_scan.FilterCondition(
+                pb_filter_condition.FilterCondition(
                     item_type=t if isinstance(t, str) else t.__name__
                 )
                 for t in item_types

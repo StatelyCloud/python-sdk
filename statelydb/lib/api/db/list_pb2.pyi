@@ -1,5 +1,6 @@
 from . import item_pb2 as _item_pb2
 from . import item_property_pb2 as _item_property_pb2
+from . import list_filters_pb2 as _list_filters_pb2
 from . import list_token_pb2 as _list_token_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
@@ -18,7 +19,7 @@ SORT_ASCENDING: SortDirection
 SORT_DESCENDING: SortDirection
 
 class BeginListRequest(_message.Message):
-    __slots__ = ("store_id", "key_path_prefix", "limit", "allow_stale", "sort_property", "sort_direction", "schema_version_id", "schema_id")
+    __slots__ = ("store_id", "key_path_prefix", "limit", "allow_stale", "sort_property", "sort_direction", "schema_version_id", "schema_id", "filter_conditions")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     KEY_PATH_PREFIX_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
@@ -27,6 +28,7 @@ class BeginListRequest(_message.Message):
     SORT_DIRECTION_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
+    FILTER_CONDITIONS_FIELD_NUMBER: _ClassVar[int]
     store_id: int
     key_path_prefix: str
     limit: int
@@ -35,7 +37,8 @@ class BeginListRequest(_message.Message):
     sort_direction: SortDirection
     schema_version_id: int
     schema_id: int
-    def __init__(self, store_id: _Optional[int] = ..., key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., allow_stale: bool = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[SortDirection, str]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...
+    filter_conditions: _containers.RepeatedCompositeFieldContainer[_list_filters_pb2.FilterCondition]
+    def __init__(self, store_id: _Optional[int] = ..., key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., allow_stale: bool = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[SortDirection, str]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ..., filter_conditions: _Optional[_Iterable[_Union[_list_filters_pb2.FilterCondition, _Mapping]]] = ...) -> None: ...
 
 class ListResponse(_message.Message):
     __slots__ = ("result", "finished")

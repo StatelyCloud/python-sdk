@@ -1,3 +1,4 @@
+from . import list_filters_pb2 as _list_filters_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -5,12 +6,6 @@ from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
-
-class FilterCondition(_message.Message):
-    __slots__ = ("item_type",)
-    ITEM_TYPE_FIELD_NUMBER: _ClassVar[int]
-    item_type: str
-    def __init__(self, item_type: _Optional[str] = ...) -> None: ...
 
 class BeginScanRequest(_message.Message):
     __slots__ = ("store_id", "filter_condition", "limit", "segmentation_params", "schema_version_id", "schema_id")
@@ -21,12 +16,12 @@ class BeginScanRequest(_message.Message):
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
     store_id: int
-    filter_condition: _containers.RepeatedCompositeFieldContainer[FilterCondition]
+    filter_condition: _containers.RepeatedCompositeFieldContainer[_list_filters_pb2.FilterCondition]
     limit: int
     segmentation_params: SegmentationParams
     schema_version_id: int
     schema_id: int
-    def __init__(self, store_id: _Optional[int] = ..., filter_condition: _Optional[_Iterable[_Union[FilterCondition, _Mapping]]] = ..., limit: _Optional[int] = ..., segmentation_params: _Optional[_Union[SegmentationParams, _Mapping]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, store_id: _Optional[int] = ..., filter_condition: _Optional[_Iterable[_Union[_list_filters_pb2.FilterCondition, _Mapping]]] = ..., limit: _Optional[int] = ..., segmentation_params: _Optional[_Union[SegmentationParams, _Mapping]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ...) -> None: ...
 
 class SegmentationParams(_message.Message):
     __slots__ = ("total_segments", "segment_index")
