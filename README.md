@@ -4,10 +4,6 @@ This is the Python SDK for [StatelyDB](https://stately.cloud).
 
 ### Getting started:
 
-##### Disclaimer:
-
-We're still in an invite-only preview mode - if you're interested, please reach out to [preview@stately.cloud](mailto:preview@stately.cloud?subject=Early%20Access%20Program).
-
 Begin by following our [Getting Started Guide] which will help you define, generate, and publish a DB schema so that it can be used.
 
 ##### Install the SDK
