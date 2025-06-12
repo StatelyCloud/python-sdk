@@ -21,6 +21,7 @@ from statelydb.src.types import (
     SchemaVersionID,
     StatelyItem,
     StatelyObject,
+    Stopper,
     StoreID,
 )
 
@@ -35,6 +36,7 @@ __all__ = [
     "StatelyError",
     "StatelyItem",
     "StatelyObject",
+    "Stopper",
     "StoreID",
     "SyncChangedItem",
     "SyncDeletedItem",

@@ -65,13 +65,16 @@ async def test_stately_token_provider_basic_functionalality() -> None:
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
 
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
         )
 
         token = await get_token()
         assert token == "test_token"  # noqa: S105
+        stop()
+    server.close()
+    await server.wait_closed()
 
 
 async def test_token_provider_refresh() -> None:
@@ -105,7 +108,7 @@ async def test_token_provider_refresh() -> None:
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
 
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
         )
@@ -130,6 +133,9 @@ async def test_token_provider_refresh() -> None:
         # works multiple times.
         await semaphore.acquire()
         assert await get_token() == "test_token-3"
+        stop()
+    server.close()
+    await server.wait_closed()
 
 
 def test_token_provider_sync_context() -> None:
@@ -152,12 +158,14 @@ def test_token_provider_sync_context() -> None:
         loop.run_until_complete(server.start("127.0.0.1"))
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
 
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
         )
         token = loop.run_until_complete(get_token())
         assert token == "test_token"  # noqa: S105
+        stop()
+    server.close()
 
 
 async def test_token_provider_transient_network_error() -> None:
@@ -187,13 +195,16 @@ async def test_token_provider_transient_network_error() -> None:
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
         )
         token = await get_token()
         assert token == "test_token"  # noqa: S105
         assert count == 2
+        stop()
+    server.close()
+    await server.wait_closed()
 
 
 async def test_token_provider_permanent_network_error() -> None:
@@ -215,7 +226,7 @@ async def test_token_provider_permanent_network_error() -> None:
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
@@ -224,6 +235,9 @@ async def test_token_provider_permanent_network_error() -> None:
         with pytest.raises(StatelyError):
             await get_token()
         assert count == RETRY_ATTEMPTS
+        stop()
+    server.close()
+    await server.wait_closed()
 
 
 @pytest.mark.parametrize(
@@ -253,7 +267,7 @@ async def test_token_provider_non_retryable_codes(
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
@@ -262,6 +276,9 @@ async def test_token_provider_non_retryable_codes(
         with pytest.raises(StatelyError):
             await get_token()
         assert count == (RETRY_ATTEMPTS if retryable else 1)
+        stop()
+    server.close()
+    await server.wait_closed()
 
 
 @pytest.mark.parametrize("code", [Status.UNAVAILABLE, Status.UNKNOWN])
@@ -285,7 +302,7 @@ async def test_token_provider_retryable_codes(code: Status) -> None:
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token = init_server_auth(
+        get_token, stop = init_server_auth(
             access_key="test_key",
             endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
@@ -294,3 +311,6 @@ async def test_token_provider_retryable_codes(code: Status) -> None:
         with pytest.raises(StatelyError):
             await get_token()
         assert count == RETRY_ATTEMPTS
+        stop()
+    server.close()
+    await server.wait_closed()

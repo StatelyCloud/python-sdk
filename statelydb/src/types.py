@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Callable, TypeVar
 from uuid import UUID
 
 from statelydb.src.errors import StatelyError
@@ -19,6 +19,8 @@ type SchemaID = int
 
 type AllKeyTypes = UUID | str | int | bytes
 AnyKeyType = TypeVar("AnyKeyType", bound=AllKeyTypes)
+
+type Stopper = Callable[[], None]
 
 
 class StatelyObject(ABC):

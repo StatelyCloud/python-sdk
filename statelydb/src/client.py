@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 from functools import cached_property
 from typing import (
@@ -23,14 +24,17 @@ from statelydb.lib.api.db import scan_pb2 as pb_scan
 from statelydb.lib.api.db import service_grpc as db
 from statelydb.lib.api.db import sync_list_pb2 as pb_sync_list
 from statelydb.lib.api.db.list_pb2 import SortDirection
-from statelydb.src.auth import AuthTokenProvider, init_server_auth
+from statelydb.src.auth import (
+    AuthTokenProvider,
+    init_server_auth,
+)
 from statelydb.src.channel import StatelyChannel
 from statelydb.src.errors import StatelyError
 from statelydb.src.list import ListResult, TokenReceiver, handle_list_response
 from statelydb.src.put_options import WithPutOptions
 from statelydb.src.sync import handle_sync_response
 from statelydb.src.transaction import Transaction
-from statelydb.src.types import StatelyItem
+from statelydb.src.types import StatelyItem, Stopper
 
 if TYPE_CHECKING:
     from statelydb.lib.api.db.list_token_pb2 import ListToken
@@ -45,11 +49,13 @@ class Client:
 
     _endpoint: str
     _token_provider: AuthTokenProvider | None
+    _token_provider_stopper: Stopper | None
     _store_id: StoreID
     _schema_version_id: SchemaVersionID
     _schema_id: SchemaID
     _type_mapper: BaseTypeMapper
     _allow_stale: bool
+    _channel: StatelyChannel | None = None
 
     def __init__(
         self,
@@ -58,6 +64,7 @@ class Client:
         schema_id: SchemaID,
         schema_version_id: SchemaVersionID,
         token_provider: AuthTokenProvider | None = None,
+        token_provider_stopper: Stopper | None = None,
         endpoint: str | None = None,
         region: str | None = None,
         no_auth: bool = False,
@@ -88,6 +95,10 @@ class Client:
             environment.
         :type token_provider: AuthTokenProvider, optional
 
+        :param token_provider_stopper: An optional stopper function for the
+            token provider. This is used to stop the token provider when the
+            client is closed. Defaults to None.
+
         :param endpoint: The Stately API endpoint to connect to. Defaults to
             "https://api.stately.cloud" if no region is provided.
         :type endpoint: str, optional
@@ -107,9 +118,15 @@ class Client:
         """
         self._endpoint = Client._make_endpoint(endpoint=endpoint, region=region)
         if not no_auth:
-            self._token_provider = token_provider or init_server_auth(
-                endpoint=self._endpoint
-            )
+            if token_provider:
+                self._token_provider = token_provider
+                self._token_provider_stopper = token_provider_stopper
+            else:
+                (
+                    self._token_provider,
+                    self._token_provider_stopper,
+                ) = init_server_auth(endpoint=self._endpoint)
+
         self._store_id = store_id
         self._schema_id = schema_id
         self._schema_version_id = schema_version_id
@@ -121,10 +138,11 @@ class Client:
     # https://github.com/vmagamedov/grpclib/issues/161
     @cached_property
     def _db_service(self) -> db.DatabaseServiceStub:
-        channel = StatelyChannel(endpoint=self._endpoint)
+        self._channel = StatelyChannel(endpoint=self._endpoint)
+
         if self._token_provider:
-            channel = channel.with_auth(token_provider=self._token_provider)
-        return db.DatabaseServiceStub(channel)
+            self._channel = self._channel.with_auth(token_provider=self._token_provider)
+        return db.DatabaseServiceStub(self._channel)
 
     @staticmethod
     def _make_endpoint(endpoint: str | None = None, region: str | None = None) -> str:
@@ -150,6 +168,21 @@ class Client:
         if region.startswith("aws-"):
             region = region.removeprefix("aws-")
         return f"https://{region}.aws.api.stately.cloud"
+
+    async def close(self) -> None:
+        """
+        Close the client and any underlying resources.
+        This doesn't have any async code but _channel.close() requires that it is
+        called from the same async context that it was created in, so we make
+        it an async method to try and ensure that.
+        """
+        if self._token_provider_stopper is not None:
+            self._token_provider_stopper()
+        if self._channel is not None:
+            # you hit a runtime error if the event loop is already closed.
+            # i think it is safe to ignore this.
+            with contextlib.suppress(RuntimeError):
+                self._channel.close()
 
     def with_allow_stale(self, allow_stale: bool = True) -> Self:
         """

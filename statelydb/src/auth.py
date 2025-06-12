@@ -8,19 +8,24 @@ that returns an access token string containing the auth token.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from collections.abc import Awaitable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from random import random
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from statelydb.lib.api.auth import get_auth_token_pb2
 from statelydb.lib.api.auth import service_grpc as auth
 from statelydb.src.channel import StatelyChannel
 from statelydb.src.errors import StatelyError, Status
 
+if TYPE_CHECKING:
+    from statelydb.src.types import Stopper
+
 type AuthTokenProvider = Callable[[], Coroutine[Any, Any, str]]
+
 
 NON_RETRYABLE_ERRORS = [
     Status.UNAUTHENTICATED,
@@ -58,7 +63,7 @@ def init_server_auth(
     access_key: str | None = None,
     endpoint: str | None = "https://api.stately.cloud",
     base_retry_backoff_secs: float = 1.0,
-) -> AuthTokenProvider:
+) -> tuple[AuthTokenProvider, Stopper]:
     """
     Create a new authenticator with the provided arguments.
 
@@ -78,8 +83,8 @@ def init_server_auth(
         Defaults to 1.0.
     :type base_retry_backoff_secs: float, optional
 
-    :return: A callable that asynchronously returns an access token string
-    :rtype: AuthTokenProvider
+    :return: A tuple containing the authenticator function and a stopper function.
+    :rtype: tuple[AuthTokenProvider, Stopper]
 
     """
     # args are evaluated at definition time
@@ -87,9 +92,12 @@ def init_server_auth(
     access_key = access_key or os.getenv("STATELY_ACCESS_KEY")
 
     token_fetcher: TokenFetcher | None = None
+    token_fetcher_stopper: Stopper | None = None
+    scheduled_refresh: asyncio.Task[Any] | None = None
+
     if access_key is not None:
         endpoint = endpoint or "https://api.stately.cloud"
-        token_fetcher = make_fetch_stately_access_token(
+        token_fetcher, token_fetcher_stopper = make_fetch_stately_access_token(
             access_key, endpoint, base_retry_backoff_secs
         )
 
@@ -109,6 +117,8 @@ def init_server_auth(
 
     async def _refresh_token_impl() -> str:
         nonlocal token_state
+        nonlocal scheduled_refresh
+        scheduled_refresh = None
 
         token_result = await token_fetcher()  # type: ignore[misc] # mypy can't work out that this can't be None
         new_expires_in_secs = token_result.expires_in_secs
@@ -134,11 +144,7 @@ def init_server_auth(
         jitter = (random() * 0.05) + 0.9
 
         # set the refresh task
-        # this will cause you to see `Task was destroyed but it is pending!`
-        # after the tests run
-        # TODO @stan-stately: implement an abort signal like JS
-        # https://app.clickup.com/t/86899vgje
-        asyncio.get_event_loop().create_task(
+        scheduled_refresh = asyncio.get_event_loop().create_task(
             _schedule(_refresh_token, new_expires_in_secs * jitter),
         )
 
@@ -148,7 +154,9 @@ def init_server_auth(
     # This method is automatically invoked when calling get_token()
     # if there is no token available.
     # It is also periodically invoked to refresh the token before it expires.
-    _refresh_token = _dedupe(lambda: asyncio.create_task(_refresh_token_impl()))
+    _refresh_token, _cancel_refresh = _dedupe(
+        lambda: asyncio.create_task(_refresh_token_impl())
+    )
 
     def valid_access_token() -> str | None:
         nonlocal token_state
@@ -165,7 +173,18 @@ def init_server_auth(
     async def get_token() -> str:
         return valid_access_token() or await _refresh_token()
 
-    return get_token
+    def shutdown() -> None:
+        nonlocal scheduled_refresh
+        nonlocal token_fetcher_stopper
+        _cancel_refresh()
+        if scheduled_refresh is not None:
+            scheduled_refresh.cancel()
+            scheduled_refresh = None
+        if token_fetcher_stopper is not None:
+            token_fetcher_stopper()
+            token_fetcher_stopper = None
+
+    return get_token, shutdown
 
 
 async def _schedule(fn: Callable[[], Awaitable[Any]], delay_secs: float) -> None:
@@ -178,36 +197,50 @@ async def _schedule(fn: Callable[[], Awaitable[Any]], delay_secs: float) -> None
 # then the result of the first task will be returned to all callers
 # and the other tasks will never be awaited
 def _dedupe(
-    task: Callable[..., asyncio.Task[Any]],
-) -> Callable[..., Awaitable[Any]]:
-    cached: asyncio.Task[Any] | None = None
+    create_task: Callable[..., asyncio.Task[Any]],
+) -> tuple[Callable[..., Awaitable[Any]], Callable[..., None]]:
+    cached_task: asyncio.Task[Any] | None = None
 
     async def _run() -> Awaitable[Any]:
-        nonlocal cached
-        cached = cached or task()
+        nonlocal cached_task
+        cached_task = cached_task or create_task()
         try:
-            return await cached
+            return await cached_task
         finally:
-            cached = None
+            cached_task = None
 
-    return _run
+    def _cancel() -> None:
+        nonlocal cached_task
+        if cached_task is not None:
+            cached_task.cancel()
+            cached_task = None
+
+    return _run, _cancel
 
 
 def make_fetch_stately_access_token(
     access_key: str, endpoint: str, base_retry_backoff_secs: float
-) -> TokenFetcher:
+) -> tuple[TokenFetcher, Stopper]:
     """make_fetch_stately_access_token creates a fetcher function that fetches a Stately token using access_key."""
     auth_service: auth.AuthServiceStub | None = None
+    channel: StatelyChannel | None = None
+
+    def stop() -> None:
+        nonlocal channel
+        if channel is not None:
+            # you hit a runtime error if the event loop is already closed.
+            # i think it is safe to ignore this.
+            with contextlib.suppress(RuntimeError):
+                channel.close()
 
     async def fetch_stately_access_token() -> TokenResult:
         nonlocal auth_service
-
+        nonlocal channel
         # lazy init the auth service. It needs to be done in
         # an async context.
         if auth_service is None:
-            auth_service = auth.AuthServiceStub(
-                StatelyChannel(endpoint=endpoint),
-            )
+            channel = channel or StatelyChannel(endpoint=endpoint)
+            auth_service = auth.AuthServiceStub(channel=channel)
 
         for i in range(RETRY_ATTEMPTS):
             try:
@@ -231,7 +264,7 @@ def make_fetch_stately_access_token(
             message="Exceeded max retry attempts but did not correctly propagate exception on final attempt.",
         )
 
-    return fetch_stately_access_token
+    return fetch_stately_access_token, stop
 
 
 def backoff(attempt: int, base_retry_backoff_secs: float) -> float:
