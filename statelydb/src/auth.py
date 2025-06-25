@@ -24,8 +24,8 @@ from statelydb.src.errors import StatelyError, Status
 if TYPE_CHECKING:
     from statelydb.src.types import Stopper
 
-type AuthTokenProvider = Callable[[], Coroutine[Any, Any, str]]
-
+# AuthTokenProvider is a callable that returns an auth token.
+AuthTokenProvider = Callable[[], Coroutine[Any, Any, str]]
 
 NON_RETRYABLE_ERRORS = [
     Status.UNAUTHENTICATED,
@@ -56,35 +56,29 @@ class TokenState:
 # TokenFetcher is a callable that returns a TokenResult
 # this is basically the abstraction that we swap out for different providers ie.
 # auth0 or stately
-type TokenFetcher = Callable[[], Coroutine[Any, Any, TokenResult]]
+TokenFetcher = Callable[[], Coroutine[Any, Any, TokenResult]]
 
 
-def init_server_auth(
+def init_server_auth(  # noqa: C901
     access_key: str | None = None,
-    endpoint: str | None = "https://api.stately.cloud",
     base_retry_backoff_secs: float = 1.0,
-) -> tuple[AuthTokenProvider, Stopper]:
+) -> tuple[Callable[[str], AuthTokenProvider], Stopper]:
     """
     Create a new authenticator with the provided arguments.
 
-    init_server_auth creates an authenticator function that asynchronously
-    returns an access token string using the provided arguments.
+    init_server_auth returns a tuple containing an func to start the token provder,
+    and a Stopper function.
 
     :param access_key: Your Stately Access Key.
         Defaults to os.getenv("STATELY_ACCESS_KEY").
     :type access_key: str, optional
 
-    :param endpoint: The endpoint to use for authentication.
-        Defaults to "https://api.stately.cloud".
-    :type endpoint: str, optional
-
-
     :param base_retry_backoff_secs: The base backoff time in seconds for retrying failed requests.
         Defaults to 1.0.
     :type base_retry_backoff_secs: float, optional
 
-    :return: A tuple containing the authenticator function and a stopper function.
-    :rtype: tuple[AuthTokenProvider, Stopper]
+    :return: A tuple containing a Callable[[str], AuthTokenProvider] and a stopper function.
+    :rtype: tuple[Callable[[str], AuthTokenProvider], Stopper]
 
     """
     # args are evaluated at definition time
@@ -95,13 +89,7 @@ def init_server_auth(
     token_fetcher_stopper: Stopper | None = None
     scheduled_refresh: asyncio.Task[Any] | None = None
 
-    if access_key is not None:
-        endpoint = endpoint or "https://api.stately.cloud"
-        token_fetcher, token_fetcher_stopper = make_fetch_stately_access_token(
-            access_key, endpoint, base_retry_backoff_secs
-        )
-
-    else:
+    if access_key is None:
         raise StatelyError(
             stately_code="Unauthenticated",
             code=Status.UNAUTHENTICATED,
@@ -130,7 +118,7 @@ def init_server_auth(
         if token_state is None or new_expires_at > token_state.expires_at:
             token_state = TokenState(token_result.token, new_expires_at)
         else:
-            # otherwise use the existing expiry time for scheduling the refresh
+            # otherwise use the existing expiry time for scheduling the refresh.
             new_expires_in_secs = int(
                 (token_state.expires_at - datetime.now(timezone.utc)).total_seconds()
             )
@@ -184,7 +172,14 @@ def init_server_auth(
             token_fetcher_stopper()
             token_fetcher_stopper = None
 
-    return get_token, shutdown
+    def start(endpoint: str = "https://api.stately.cloud") -> AuthTokenProvider:
+        nonlocal token_fetcher, token_fetcher_stopper
+        token_fetcher, token_fetcher_stopper = make_fetch_stately_access_token(
+            access_key, endpoint, base_retry_backoff_secs
+        )
+        return get_token
+
+    return start, shutdown
 
 
 async def _schedule(fn: Callable[[], Awaitable[Any]], delay_secs: float) -> None:

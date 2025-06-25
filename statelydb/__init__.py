@@ -1,5 +1,6 @@
 """The main module for the statelydb package."""
 
+from statelydb.lib.api.db.list_pb2 import Operator
 from statelydb.lib.api.db.list_token_pb2 import ListToken
 from statelydb.src.auth import AuthTokenProvider, init_server_auth
 from statelydb.src.client import SortDirection
@@ -29,6 +30,7 @@ __all__ = [
     "AuthTokenProvider",
     "ListResult",
     "ListToken",
+    "Operator",
     "SchemaID",
     "SchemaVersionID",
     "SortDirection",

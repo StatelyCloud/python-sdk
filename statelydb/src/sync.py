@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 
 from grpclib.const import Status
 from grpclib.exceptions import StreamTerminatedError
@@ -10,6 +10,8 @@ from grpclib.exceptions import StreamTerminatedError
 from statelydb.src.errors import StatelyError
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from grpclib.client import Stream
 
     from statelydb.lib.api.db import sync_list_pb2 as pb_sync_list

@@ -1,6 +1,6 @@
 # StatelyDB SDK for Python
 
-This is the Python SDK for [StatelyDB](https://stately.cloud).
+This is the Python SDK for [StatelyDB](https://stately.cloud). StatelyDB is a document database built on top of DynamoDB. It uses Elastic Schema to allow you to update your data model at any time, with automatic backwards and forwards compatibility.
 
 ### Getting started:
 

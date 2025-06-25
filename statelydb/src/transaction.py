@@ -15,11 +15,17 @@ from typing_extensions import Self
 
 from statelydb.lib.api.db import delete_pb2 as pb_delete
 from statelydb.lib.api.db import get_pb2 as pb_get
+from statelydb.lib.api.db import list_filters_pb2 as pb_filter_condition
+from statelydb.lib.api.db import list_pb2 as pb_list
 from statelydb.lib.api.db import put_pb2 as pb_put
 from statelydb.lib.api.db import transaction_pb2 as pb_transaction
 from statelydb.lib.api.db.list_pb2 import SortDirection
 from statelydb.src.errors import StatelyError
-from statelydb.src.list import ListResult, TokenReceiver, handle_list_response
+from statelydb.src.list import (
+    ListResult,
+    TokenReceiver,
+    handle_list_response,
+)
 from statelydb.src.put_options import WithPutOptions
 from statelydb.src.types import StatelyItem
 
@@ -401,6 +407,11 @@ class Transaction(
         key_path_prefix: str,
         limit: int = 0,
         sort_direction: SortDirection = SortDirection.SORT_ASCENDING,
+        item_types: list[type[StatelyItem] | str] | None = None,
+        gt: str | None = None,
+        lt: str | None = None,
+        gte: str | None = None,
+        lte: str | None = None,
     ) -> ListResult[StatelyItem]:
         """
         begin_list retrieves Items that start with a specified key path prefix.
@@ -429,6 +440,27 @@ class Transaction(
             SortDirection.SORT_ASCENDING.
         :type sort_direction: SortDirection, optional
 
+
+        :param item_types: The item types to filter by. If not provided, all item
+            types will be returned.
+        :type item_types: list[type[T] | str], optional
+
+        :param gt: An optional key path to filter results to only include items with a key greater than the
+            specified value based on lexicographic ordering. Defaults to None.
+        :type gt: str, optional
+
+        :param lt: An optional key path to filter results to only include items with a key less than the
+            specified value based on lexicographic ordering. Defaults to None.
+        :type lt: str, optional
+
+        :param gte: An optional key path to filter results to only include items with a key greater than or equal
+            to the specified value based on lexicographic ordering. Defaults to None.
+        :type gte: str, optional
+
+        :param lte: An optional key path to filter results to only include items with a key less than or equal
+            to the specified value based on lexicographic ordering. Defaults to None.
+        :type lte: str, optional
+
         :return: The result generator.
         :rtype: ListResult[StatelyItem]
 
@@ -443,11 +475,34 @@ class Transaction(
                 token = list_resp.token
 
         """
+        filters: list[pb_filter_condition.FilterCondition] = []
+        if item_types is not None:
+            filters = [
+                pb_filter_condition.FilterCondition(
+                    item_type=t if isinstance(t, str) else t.__name__
+                )
+                for t in item_types
+            ]
+
+        # Build key conditions for gt, gte, lt, lte
+        ops = [
+            (gt, pb_list.OPERATOR_GREATER_THAN),
+            (gte, pb_list.OPERATOR_GREATER_THAN_OR_EQUAL),
+            (lt, pb_list.OPERATOR_LESS_THAN),
+            (lte, pb_list.OPERATOR_LESS_THAN_OR_EQUAL),
+        ]
+        kcs = [
+            pb_list.KeyCondition(operator=op, key_path=val)
+            for val, op in ops
+            if val is not None
+        ]
         msg_id = await self._request_only(
             begin_list=pb_transaction.TransactionBeginList(
                 key_path_prefix=key_path_prefix,
                 limit=limit,
                 sort_direction=sort_direction,
+                filter_conditions=filters,
+                key_conditions=kcs,
             ),
         )
         token_receiver = TokenReceiver(token=None)

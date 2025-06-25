@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, TypeVar
+from typing import TYPE_CHECKING, Callable, TypeVar, Union
 from uuid import UUID
 
 from statelydb.src.errors import StatelyError
@@ -13,14 +13,14 @@ if TYPE_CHECKING:
 
     from statelydb.lib.api.db.item_pb2 import Item as PBItem
 
-type StoreID = int
-type SchemaVersionID = int
-type SchemaID = int
+StoreID = int
+SchemaVersionID = int
+SchemaID = int
 
-type AllKeyTypes = UUID | str | int | bytes
+AllKeyTypes = Union[UUID, str, int, bytes]
 AnyKeyType = TypeVar("AnyKeyType", bound=AllKeyTypes)
 
-type Stopper = Callable[[], None]
+Stopper = Callable[[], None]
 
 
 class StatelyObject(ABC):

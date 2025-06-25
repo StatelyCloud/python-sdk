@@ -5,13 +5,10 @@ from __future__ import annotations
 import contextlib
 import copy
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Self,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Callable, TypeVar
 
 from grpclib.const import Status
+from typing_extensions import Self
 
 from statelydb.lib.api.db import continue_list_pb2 as pb_continue_list
 from statelydb.lib.api.db import continue_scan_pb2 as pb_continue_scan
@@ -30,7 +27,11 @@ from statelydb.src.auth import (
 )
 from statelydb.src.channel import StatelyChannel
 from statelydb.src.errors import StatelyError
-from statelydb.src.list import ListResult, TokenReceiver, handle_list_response
+from statelydb.src.list import (
+    ListResult,
+    TokenReceiver,
+    handle_list_response,
+)
 from statelydb.src.put_options import WithPutOptions
 from statelydb.src.sync import handle_sync_response
 from statelydb.src.transaction import Transaction
@@ -63,7 +64,7 @@ class Client:
         type_mapper: BaseTypeMapper,
         schema_id: SchemaID,
         schema_version_id: SchemaVersionID,
-        token_provider: AuthTokenProvider | None = None,
+        token_provider: Callable[[str], AuthTokenProvider] | None = None,
         token_provider_stopper: Stopper | None = None,
         endpoint: str | None = None,
         region: str | None = None,
@@ -90,10 +91,10 @@ class Client:
             client matches the schema used by the server.
         :type schema_version_id: SchemaVersionID
 
-        :param token_provider: An optional token provider function. Defaults to
+        :param token_provider: An optional auth token provider. Defaults to
             reading `STATELY_CLIENT_ID` and `STATELY_CLIENT_SECRET` from the
             environment.
-        :type token_provider: AuthTokenProvider, optional
+        :type token_provider: Callable[[str], AuthTokenProvider], optional
 
         :param token_provider_stopper: An optional stopper function for the
             token provider. This is used to stop the token provider when the
@@ -119,13 +120,11 @@ class Client:
         self._endpoint = Client._make_endpoint(endpoint=endpoint, region=region)
         if not no_auth:
             if token_provider:
-                self._token_provider = token_provider
+                self._token_provider = token_provider(self._endpoint)
                 self._token_provider_stopper = token_provider_stopper
             else:
-                (
-                    self._token_provider,
-                    self._token_provider_stopper,
-                ) = init_server_auth(endpoint=self._endpoint)
+                token_provider, self._token_provider_stopper = init_server_auth()
+                self._token_provider = token_provider(self._endpoint)
 
         self._store_id = store_id
         self._schema_id = schema_id
@@ -453,6 +452,11 @@ class Client:
         key_path_prefix: str,
         limit: int = 0,
         sort_direction: SortDirection = SortDirection.SORT_ASCENDING,
+        item_types: list[type[StatelyItem] | str] | None = None,
+        gt: str | None = None,
+        lt: str | None = None,
+        gte: str | None = None,
+        lte: str | None = None,
     ) -> ListResult[StatelyItem]:
         """
         begin_list retrieves Items that start with a specified key_path_prefix.
@@ -481,6 +485,26 @@ class Client:
             SortDirection.SORT_ASCENDING.
         :type sort_direction: SortDirection, optional
 
+        :param item_types: The item types to filter by. If not provided, all item
+            types will be returned.
+        :type item_types: list[type[T] | str], optional
+
+        :param gt: An optional key path to filter results to only include items with a key greater than the
+            specified value based on lexicographic ordering. Defaults to None.
+        :type gt: str, optional
+
+        :param lt: An optional key path to filter results to only include items with a key less than the
+            specified value based on lexicographic ordering. Defaults to None.
+        :type lt: str, optional
+
+        :param gte: An optional key path to filter results to only include items with a key greater than or equal
+            to the specified value based on lexicographic ordering. Defaults to None.
+        :type gte: str, optional
+
+        :param lte: An optional key path to filter results to only include items with a key less than or equal
+            to the specified value based on lexicographic ordering. Defaults to None.
+        :type lte: str, optional
+
         :return: The result generator.
         :rtype: ListResult[StatelyItem]
 
@@ -496,6 +520,27 @@ class Client:
             token = list_resp.token
 
         """
+        filters: list[pb_filter_condition.FilterCondition] = []
+        if item_types is not None:
+            filters = [
+                pb_filter_condition.FilterCondition(
+                    item_type=t if isinstance(t, str) else t.__name__
+                )
+                for t in item_types
+            ]
+        # Build key conditions for gt, gte, lt, lte
+        ops = [
+            (gt, pb_list.OPERATOR_GREATER_THAN),
+            (gte, pb_list.OPERATOR_GREATER_THAN_OR_EQUAL),
+            (lt, pb_list.OPERATOR_LESS_THAN),
+            (lte, pb_list.OPERATOR_LESS_THAN_OR_EQUAL),
+        ]
+        kcs = [
+            pb_list.KeyCondition(operator=op, key_path=val)
+            for val, op in ops
+            if val is not None
+        ]
+
         # grpclib only supports streaming with a context manager but that doesn't work
         # here because we want to wrap the stream and return it to the customer for them
         # to read at their leisure.
@@ -512,6 +557,8 @@ class Client:
                 limit=limit,
                 sort_direction=sort_direction,
                 schema_id=self._schema_id,
+                filter_conditions=filters,
+                key_conditions=kcs,
                 schema_version_id=self._schema_version_id,
             ),
         )

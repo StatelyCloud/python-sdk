@@ -65,10 +65,8 @@ async def test_stately_token_provider_basic_functionalality() -> None:
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
 
-        get_token, stop = init_server_auth(
-            access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
-        )
+        init, stop = init_server_auth(access_key="test_key")
+        get_token = init(f"http://127.0.0.1:{port}")
 
         token = await get_token()
         assert token == "test_token"  # noqa: S105
@@ -108,10 +106,8 @@ async def test_token_provider_refresh() -> None:
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
 
-        get_token, stop = init_server_auth(
-            access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
-        )
+        init, stop = init_server_auth(access_key="test_key")
+        get_token = init(f"http://127.0.0.1:{port}")
 
         start = datetime.now()
         tasks = [get_token() for _ in range(200)]
@@ -158,10 +154,8 @@ def test_token_provider_sync_context() -> None:
         loop.run_until_complete(server.start("127.0.0.1"))
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
 
-        get_token, stop = init_server_auth(
-            access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
-        )
+        init, stop = init_server_auth(access_key="test_key")
+        get_token = init(f"http://127.0.0.1:{port}")
         token = loop.run_until_complete(get_token())
         assert token == "test_token"  # noqa: S105
         stop()
@@ -195,10 +189,8 @@ async def test_token_provider_transient_network_error() -> None:
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token, stop = init_server_auth(
-            access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
-        )
+        init, stop = init_server_auth(access_key="test_key")
+        get_token = init(f"http://127.0.0.1:{port}")
         token = await get_token()
         assert token == "test_token"  # noqa: S105
         assert count == 2
@@ -226,11 +218,11 @@ async def test_token_provider_permanent_network_error() -> None:
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token, stop = init_server_auth(
+        init, stop = init_server_auth(
             access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
         )
+        get_token = init(f"http://127.0.0.1:{port}")
 
         with pytest.raises(StatelyError):
             await get_token()
@@ -267,11 +259,11 @@ async def test_token_provider_non_retryable_codes(
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token, stop = init_server_auth(
+        init, stop = init_server_auth(
             access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
         )
+        get_token = init(f"http://127.0.0.1:{port}")
 
         with pytest.raises(StatelyError):
             await get_token()
@@ -302,12 +294,11 @@ async def test_token_provider_retryable_codes(code: Status) -> None:
     with graceful_exit([server]):
         await server.start("127.0.0.1")
         port = server._server.sockets[0].getsockname()[1]  # type: ignore[reportUnknownMemberType,union-attr] # noqa: SLF001
-        get_token, stop = init_server_auth(
+        init, stop = init_server_auth(
             access_key="test_key",
-            endpoint=f"http://127.0.0.1:{port}",
             base_retry_backoff_secs=0.01,
         )
-
+        get_token = init(f"http://127.0.0.1:{port}")
         with pytest.raises(StatelyError):
             await get_token()
         assert count == RETRY_ATTEMPTS

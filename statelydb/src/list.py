@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Generic, Never, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from grpclib.client import Stream
 from grpclib.const import Status
 from grpclib.exceptions import StreamTerminatedError
+from typing_extensions import Never
 
 from statelydb.src.errors import StatelyError
 from statelydb.src.sync import SyncResult

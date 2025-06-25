@@ -4,6 +4,7 @@ from . import get_pb2 as _get_pb2
 from . import item_pb2 as _item_pb2
 from . import item_property_pb2 as _item_property_pb2
 from . import list_pb2 as _list_pb2
+from . import list_filters_pb2 as _list_filters_pb2
 from . import put_pb2 as _put_pb2
 from google.protobuf import empty_pb2 as _empty_pb2
 from google.protobuf.internal import containers as _containers
@@ -67,16 +68,20 @@ class TransactionGet(_message.Message):
     def __init__(self, gets: _Optional[_Iterable[_Union[_get_pb2.GetItem, _Mapping]]] = ...) -> None: ...
 
 class TransactionBeginList(_message.Message):
-    __slots__ = ("key_path_prefix", "limit", "sort_property", "sort_direction")
+    __slots__ = ("key_path_prefix", "limit", "sort_property", "sort_direction", "filter_conditions", "key_conditions")
     KEY_PATH_PREFIX_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     SORT_PROPERTY_FIELD_NUMBER: _ClassVar[int]
     SORT_DIRECTION_FIELD_NUMBER: _ClassVar[int]
+    FILTER_CONDITIONS_FIELD_NUMBER: _ClassVar[int]
+    KEY_CONDITIONS_FIELD_NUMBER: _ClassVar[int]
     key_path_prefix: str
     limit: int
     sort_property: _item_property_pb2.SortableProperty
     sort_direction: _list_pb2.SortDirection
-    def __init__(self, key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[_list_pb2.SortDirection, str]] = ...) -> None: ...
+    filter_conditions: _containers.RepeatedCompositeFieldContainer[_list_filters_pb2.FilterCondition]
+    key_conditions: _containers.RepeatedCompositeFieldContainer[_list_pb2.KeyCondition]
+    def __init__(self, key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[_list_pb2.SortDirection, str]] = ..., filter_conditions: _Optional[_Iterable[_Union[_list_filters_pb2.FilterCondition, _Mapping]]] = ..., key_conditions: _Optional[_Iterable[_Union[_list_pb2.KeyCondition, _Mapping]]] = ...) -> None: ...
 
 class TransactionContinueList(_message.Message):
     __slots__ = ("token_data", "direction")
