@@ -14,7 +14,6 @@ from statelydb.lib.api.db import continue_list_pb2 as pb_continue_list
 from statelydb.lib.api.db import continue_scan_pb2 as pb_continue_scan
 from statelydb.lib.api.db import delete_pb2 as pb_delete
 from statelydb.lib.api.db import get_pb2 as pb_get
-from statelydb.lib.api.db import list_filters_pb2 as pb_filter_condition
 from statelydb.lib.api.db import list_pb2 as pb_list
 from statelydb.lib.api.db import put_pb2 as pb_put
 from statelydb.lib.api.db import scan_pb2 as pb_scan
@@ -30,6 +29,7 @@ from statelydb.src.errors import StatelyError
 from statelydb.src.list import (
     ListResult,
     TokenReceiver,
+    build_filters,
     handle_list_response,
 )
 from statelydb.src.put_options import WithPutOptions
@@ -453,6 +453,7 @@ class Client:
         limit: int = 0,
         sort_direction: SortDirection = SortDirection.SORT_ASCENDING,
         item_types: list[type[StatelyItem] | str] | None = None,
+        cel_filters: list[tuple[type[StatelyItem] | str, str]] | None = None,
         gt: str | None = None,
         lt: str | None = None,
         gte: str | None = None,
@@ -489,6 +490,26 @@ class Client:
             types will be returned.
         :type item_types: list[type[T] | str], optional
 
+        :param cel_filters: An optional list of (item type, CEL expressions) tuples to filter
+            the results set by.
+
+            CEL expressions are only evaluated for the item type they are defined for, and
+            do not affect other item types in the result set. This means if an item type has
+            no CEL filter and there are no item_type filters constraints, it will be included
+            in the result set.
+
+            In the context of a CEL expression, the key-word `this` refers to the item being
+            evaluated, and property properties should be accessed by the names as they appear
+            in schema -- not necessarily as they appear in the generated code for a particular
+            language. For example, if you have a `Movie` item type with the property `rating`,
+            you could write a CEL expression like `this.rating == 'R'` to return only movies
+            that are rated `R`.
+
+            Find the full CEL language definition here:
+            https://github.com/google/cel-spec/blob/master/doc/langdef.md
+        :type cel_filters: list[tuple[type[T] | str, str]], optional
+
+
         :param gt: An optional key path to filter results to only include items with a key greater than the
             specified value based on lexicographic ordering. Defaults to None.
         :type gt: str, optional
@@ -520,14 +541,6 @@ class Client:
             token = list_resp.token
 
         """
-        filters: list[pb_filter_condition.FilterCondition] = []
-        if item_types is not None:
-            filters = [
-                pb_filter_condition.FilterCondition(
-                    item_type=t if isinstance(t, str) else t.__name__
-                )
-                for t in item_types
-            ]
         # Build key conditions for gt, gte, lt, lte
         ops = [
             (gt, pb_list.OPERATOR_GREATER_THAN),
@@ -557,7 +570,7 @@ class Client:
                 limit=limit,
                 sort_direction=sort_direction,
                 schema_id=self._schema_id,
-                filter_conditions=filters,
+                filter_conditions=build_filters(item_types, cel_filters),
                 key_conditions=kcs,
                 schema_version_id=self._schema_version_id,
             ),
@@ -651,9 +664,6 @@ class Client:
         You can sync items of different types in a single syncList, and you can use
         `isinstance` to handle different item types.
 
-        WARNING: THIS API CAN BE EXTREMELY EXPENSIVE FOR STORES WITH A LARGE NUMBER
-        OF ITEMS.
-
         :param token: The token from the previous list operation.
         :type token: ListToken
 
@@ -693,6 +703,7 @@ class Client:
         self,
         limit: int = 0,
         item_types: list[type[StatelyItem] | str] | None = None,
+        cel_filters: list[tuple[type[StatelyItem] | str, str]] | None = None,
         total_segments: int | None = None,
         segment_index: int | None = None,
     ) -> ListResult[StatelyItem]:
@@ -723,6 +734,25 @@ class Client:
             types will be returned.
         :type item_types: list[type[T] | str], optional
 
+        :param cel_filters: An optional list of (item type, CEL expressions) tuples to filter
+            the results set by.
+
+            CEL expressions are only evaluated for the item type they are defined for, and
+            do not affect other item types in the result set. This means if an item type has
+            no CEL filter and there are no item_type filters constraints, it will be included
+            in the result set.
+
+            In the context of a CEL expression, the key-word `this` refers to the item being
+            evaluated, and property properties should be accessed by the names as they appear
+            in schema -- not necessarily as they appear in the generated code for a particular
+            language. For example, if you have a `Movie` item type with the property `rating`,
+            you could write a CEL expression like `this.rating == 'R'` to return only movies
+            that are rated `R`.
+
+            Find the full CEL language definition here:
+            https://github.com/google/cel-spec/blob/master/doc/langdef.md
+        :type cel_filters: list[tuple[type[T] | str, str]], optional
+
         :param total_segments: The total number of segments to divide the
             scan into. Use this when you want to parallelize your operation.
             Defaults to None.
@@ -748,15 +778,6 @@ class Client:
             token = list_resp.token
 
         """
-        filters: list[pb_filter_condition.FilterCondition] = []
-        if item_types is not None:
-            filters = [
-                pb_filter_condition.FilterCondition(
-                    item_type=t if isinstance(t, str) else t.__name__
-                )
-                for t in item_types
-            ]
-
         if total_segments is None != segment_index is None:
             msg = "total_segments and segment_index must both be set or both be None"
             raise StatelyError(
@@ -778,7 +799,7 @@ class Client:
             pb_scan.BeginScanRequest(
                 store_id=self._store_id,
                 limit=limit,
-                filter_condition=filters,
+                filter_condition=build_filters(item_types, cel_filters),
                 schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),

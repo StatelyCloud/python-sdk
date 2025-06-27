@@ -15,7 +15,6 @@ from typing_extensions import Self
 
 from statelydb.lib.api.db import delete_pb2 as pb_delete
 from statelydb.lib.api.db import get_pb2 as pb_get
-from statelydb.lib.api.db import list_filters_pb2 as pb_filter_condition
 from statelydb.lib.api.db import list_pb2 as pb_list
 from statelydb.lib.api.db import put_pb2 as pb_put
 from statelydb.lib.api.db import transaction_pb2 as pb_transaction
@@ -24,6 +23,7 @@ from statelydb.src.errors import StatelyError
 from statelydb.src.list import (
     ListResult,
     TokenReceiver,
+    build_filters,
     handle_list_response,
 )
 from statelydb.src.put_options import WithPutOptions
@@ -408,6 +408,7 @@ class Transaction(
         limit: int = 0,
         sort_direction: SortDirection = SortDirection.SORT_ASCENDING,
         item_types: list[type[StatelyItem] | str] | None = None,
+        cel_filters: list[tuple[type[StatelyItem] | str, str]] | None = None,
         gt: str | None = None,
         lt: str | None = None,
         gte: str | None = None,
@@ -440,10 +441,28 @@ class Transaction(
             SortDirection.SORT_ASCENDING.
         :type sort_direction: SortDirection, optional
 
-
         :param item_types: The item types to filter by. If not provided, all item
             types will be returned.
         :type item_types: list[type[T] | str], optional
+
+        :param cel_filters: An optional list of (item type, CEL expressions) tuples to filter
+            the results set by.
+
+            CEL expressions are only evaluated for the item type they are defined for, and
+            do not affect other item types in the result set. This means if an item type has
+            no CEL filter and there are no item_type filters constraints, it will be included
+            in the result set.
+
+            In the context of a CEL expression, the key-word `this` refers to the item being
+            evaluated, and property properties should be accessed by the names as they appear
+            in schema -- not necessarily as they appear in the generated code for a particular
+            language. For example, if you have a `Movie` item type with the property `rating`,
+            you could write a CEL expression like `this.rating == 'R'` to return only movies
+            that are rated `R`.
+
+            Find the full CEL language definition here:
+            https://github.com/google/cel-spec/blob/master/doc/langdef.md
+        :type cel_filters: list[tuple[type[T] | str, str]], optional
 
         :param gt: An optional key path to filter results to only include items with a key greater than the
             specified value based on lexicographic ordering. Defaults to None.
@@ -475,15 +494,6 @@ class Transaction(
                 token = list_resp.token
 
         """
-        filters: list[pb_filter_condition.FilterCondition] = []
-        if item_types is not None:
-            filters = [
-                pb_filter_condition.FilterCondition(
-                    item_type=t if isinstance(t, str) else t.__name__
-                )
-                for t in item_types
-            ]
-
         # Build key conditions for gt, gte, lt, lte
         ops = [
             (gt, pb_list.OPERATOR_GREATER_THAN),
@@ -501,7 +511,7 @@ class Transaction(
                 key_path_prefix=key_path_prefix,
                 limit=limit,
                 sort_direction=sort_direction,
-                filter_conditions=filters,
+                filter_conditions=build_filters(item_types, cel_filters),
                 key_conditions=kcs,
             ),
         )

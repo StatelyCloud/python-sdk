@@ -11,6 +11,7 @@ from grpclib.const import Status
 from grpclib.exceptions import StreamTerminatedError
 from typing_extensions import Never
 
+from statelydb.lib.api.db import list_filters_pb2 as pb_filter_condition
 from statelydb.src.errors import StatelyError
 from statelydb.src.sync import SyncResult
 from statelydb.src.types import StatelyItem
@@ -177,3 +178,46 @@ async def handle_list_response(
             # and get converted to a StatelyError
             await stream.__aexit__(None, None, None)
         raise
+
+
+def build_filters(
+    item_types: list[type[StatelyItem] | str] | None = None,
+    cel_filters: list[tuple[type[StatelyItem] | str, str]] | None = None,
+) -> list[pb_filter_condition.FilterCondition]:
+    """
+    build_filters is a helper to construct FilterCondition objects from item type filters and
+    CEL filters used in list and scan operations.
+
+    :param item_types: A list of item types to filter by. If not provided, all item
+        types will be included.
+    :type item_types: list[type[T] | str], optional
+
+    :param cel_filters: A list of tuples where each tuple contains an item type and a
+        CEL expression to filter by. The item type can be a string or a type.
+    :type cel_filters: list[tuple[type[T] | str, str]], optional
+
+    :return: A list of FilterCondition objects.
+    :rtype: list[pb_filter_condition.FilterCondition]
+
+    """
+    filters: list[pb_filter_condition.FilterCondition] = []
+    if item_types is not None:
+        filters = [
+            pb_filter_condition.FilterCondition(
+                item_type=t if isinstance(t, str) else t.__name__
+            )
+            for t in item_types
+        ]
+    if cel_filters is not None:
+        filters.extend(
+            [
+                pb_filter_condition.FilterCondition(
+                    cel_expression=pb_filter_condition.CelExpression(
+                        item_type=f[0] if isinstance(f[0], str) else f[0].__name__,
+                        expression=f[1],
+                    )
+                )
+                for f in cel_filters
+            ]
+        )
+    return filters
