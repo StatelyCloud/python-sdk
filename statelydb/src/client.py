@@ -8,7 +8,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Callable, TypeVar
 
 from grpclib.const import Status
-from typing_extensions import Self
+from typing_extensions import Self, TypedDict
 
 from statelydb.lib.api.db import continue_list_pb2 as pb_continue_list
 from statelydb.lib.api.db import continue_scan_pb2 as pb_continue_scan
@@ -43,6 +43,19 @@ if TYPE_CHECKING:
     from statelydb.src.types import BaseTypeMapper, SchemaID, SchemaVersionID, StoreID
 
 T = TypeVar("T", bound=StatelyItem)
+
+
+class ClientArgs(TypedDict, total=False):
+    """
+    A type helper for the keyword arguments to the generated Client
+    constructor.
+    """
+
+    token_provider: Callable[[str], AuthTokenProvider]
+    token_provider_stopper: Stopper
+    endpoint: str
+    region: str
+    no_auth: bool
 
 
 class Client:
