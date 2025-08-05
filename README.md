@@ -31,6 +31,10 @@ async def put_my_item() -> None:
     put_result = await client.put(item)
     get_result = await client.get(MyItem, put_result.key_path())
     assert put_result == get_result
+
+    # Properly close the client to release
+    # any network connections and resources.
+    await client.close()
 ```
 
 ---

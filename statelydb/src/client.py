@@ -812,7 +812,7 @@ class Client:
             pb_scan.BeginScanRequest(
                 store_id=self._store_id,
                 limit=limit,
-                filter_condition=build_filters(item_types, cel_filters),
+                filter_conditions=build_filters(item_types, cel_filters),
                 schema_id=self._schema_id,
                 schema_version_id=self._schema_version_id,
             ),
