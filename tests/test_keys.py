@@ -51,9 +51,7 @@ def test_key_id__int() -> None:
 
 
 def test_key_id__negative_int() -> None:
-    with pytest.raises(StatelyError) as e:
-        key_id(-1234)
-    assert e.value.stately_code == "InvalidKeyPath"
+    assert key_id(-1234) == "-1234"
 
 
 def test_key_id__invalid_type() -> None:

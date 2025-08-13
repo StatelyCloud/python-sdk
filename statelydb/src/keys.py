@@ -55,12 +55,6 @@ def key_id(val: AllKeyTypes) -> str:
     if isinstance(val, str):
         return val.replace("/", "%/")
     if isinstance(val, int):
-        if val < 0:
-            raise StatelyError(
-                stately_code="InvalidKeyPath",
-                code=Status.INVALID_ARGUMENT,
-                message=f"Key IDs must be positive integers, got: {val}",
-            )
         return str(val)
     if isinstance(val, UUID):  # type: ignore[reportUnnecessaryIsInstance]
         return f"{encode_bytes(val.bytes)}"
