@@ -218,19 +218,17 @@ class Client:
 
     async def get(self, item_type: type[T], key_path: str) -> T | None:
         """
-        get retrieves an item by its full key path. This will return the item if it
-        exists, or undefined if it does not. It will fail if  the caller does not
-        have permission to read Items.
+        get retrieves an item by its full key path.
 
-        :param item_type: One of the itemType names from your schema.
-                This is used to determine the type of the resulting item.
+        :param item_type: One of the itemType names from your schema. This is
+                used to determine the type of the resulting item.
         :type item_type: type[T]
 
         :param key_path: The full key path of the item.
         :type key_path: str
 
-        :return: The Stately Item retrieved from the store or None if no
-            item was found.
+        :return: The Stately Item retrieved from the store or None if no item
+            was found.
         :rtype: T | None
 
         Examples
@@ -267,16 +265,14 @@ class Client:
 
     async def get_batch(self, *key_paths: str) -> list[StatelyItem]:
         """
-        get_batch retrieves a set of up to 50 items by their full key paths.
-        This will return the corresponding items that exist. It will fail if the
-        caller does not have permission to read Items. Use BeginList if you want
-        to retrieve multiple items but don't already know the full key paths of
-        the items you want to get. You can get items of different types in a
-        single getBatch - you will need to use `DatabaseClient.isType` to
-        determine what item type each item is.
+        get_batch retrieves multiple items by their full key paths. This will
+        return the corresponding items that exist. Use begin_list instead if you
+        want to retrieve multiple items but don't already know the full key
+        paths of the items you want to get. You can get items of different types
+        in a single get_batch - you will need to use `isinstance` to determine
+        what item type each item is.
 
-        :param *key_paths: The full key path of each item to load. Max 50 key
-            paths.
+        :param *key_paths: The full key path of each item to load.
         :type *key_paths: str
 
         :return: The list of Items retrieved from the store. These are returned
@@ -318,8 +314,13 @@ class Client:
     ) -> T:
         """
         put adds an Item to the Store, or replaces the Item if it already exists
-        at that path. This will fail if the caller does not have permission to
-        create Items.
+        at that path.
+
+        This call will fail if:
+            - The Item conflicts with an existing Item at the same path and the
+              must_not_exist option is set, or the item's ID will be chosen with
+              an `initialValue` and one of its other key paths conflicts with an
+              existing item.
 
         :param item: An Item from your generated schema.
         :param must_not_exist: This is a condition that indicates this item must
@@ -383,13 +384,18 @@ class Client:
         self, *items: StatelyItem | WithPutOptions
     ) -> list[StatelyItem]:
         """
-        put_batch adds up to 50 Items to the Store, or replaces Items if they
-        already exist at that path. This will fail if the caller does not have
-        permission to create Items. Data must be provided as a schema type
-        generated from your defined schema. You can put items of different types
-        in a single putBatch.
+        put_batch adds multiple Items to the Store, or replaces Items if they
+        already exist at that path. You can put items of different types in a
+        single put_batch. All puts in the request are applied atomically - there
+        are no partial successes.
 
-        :param *items: Items from your generated schema. Max 50 items.
+        This will fail if:
+            - Any Item conflicts with an existing Item at the same path and its
+             must_not_exist option is set, or the item's ID will be chosen with
+             an `initialValue` and one of its other key paths conflicts with an
+             existing item.
+
+        :param *items: Items from your generated schema.
         :type *items: StatelyItem
 
         :return: The items that were put, with any server-generated fields
@@ -435,10 +441,13 @@ class Client:
 
     async def delete(self, *key_paths: str) -> None:
         """
-        delete removes up to 50 Items from the Store by their full key paths.
-        This will fail if the caller does not have permission to delete Items.
+        delete removes one or more items from the Store by their full key paths.
+        delete succeeds even if there isn't an item at that key path. Tombstones
+        will be saved for deleted items for some time, so that sync_list can
+        return information about deleted items. Deletes are always applied
+        atomically; all will fail or all will succeed.
 
-        :param *key_paths: The full key paths of the items. Max 50 key paths.
+        :param *key_paths: The full key paths of the items.
         :type *key_paths: str
 
         :return: None
@@ -473,13 +482,15 @@ class Client:
         lte: str | None = None,
     ) -> ListResult[StatelyItem]:
         """
-        begin_list retrieves Items that start with a specified key_path_prefix.
-        The key path prefix must minimally contain a Group Key (a single key
-        segment with a namespace and an ID). BeginList will return an empty
-        result set if there are no items matching that key prefix. This API
-        returns a token that you can pass to ContinueList to expand the result
-        set, or to SyncList to get updates within the result set. This can fail
-        if the caller does not have permission to read Items.
+        begin_list retrieves Items that start with a specified key_path_prefix
+        from a single Group. Because it can only list items from a single Group,
+        the key path prefix must at least start with a full Group Key (a single
+        key segment with a namespace and an ID, e.g. `/user-1234`).
+
+        begin_list will return an empty result set if there are no items
+        matching that key prefix. This API returns a token that you can pass to
+        continue_list to expand the result set, or to sync_list to get updates
+        within the result set.
 
         begin_list streams results via an AsyncGenerator, allowing you to handle
         results as they arrive. You can call `collect()` on it to get all the
@@ -488,7 +499,8 @@ class Client:
         You can list items of different types in a single begin_list, and you
         can use `isinstance` to handle different item types.
 
-        :param key_path_prefix: The key path prefix to query for.
+        :param key_path_prefix: The key path prefix to query for. It must be at
+            least a full Group Key (e.g. `/user-1234`).
         :type key_path_prefix: str
 
         :param limit: The max number of items to retrieve. If set to 0 then the
@@ -499,44 +511,50 @@ class Client:
             SortDirection.SORT_ASCENDING.
         :type sort_direction: SortDirection, optional
 
-        :param item_types: The item types to filter by. If not provided, all item
-            types will be returned.
+        :param item_types: The item types to filter by. If not provided, all
+            item types will be returned.
         :type item_types: list[type[T] | str], optional
 
-        :param cel_filters: An optional list of (item type, CEL expressions) tuples to filter
-            the results set by.
+        :param cel_filters: An optional list of (item type, CEL expressions)
+            tuples to filter the results set by.
 
-            CEL expressions are only evaluated for the item type they are defined for, and
-            do not affect other item types in the result set. This means if an item type has
-            no CEL filter and there are no item_type filters constraints, it will be included
-            in the result set.
+            CEL expressions are only evaluated for the item type they are
+            defined for, and do not affect other item types in the result set.
+            This means if an item type has no CEL filter and there are no
+            item_type filters constraints, it will be included in the result
+            set.
 
-            In the context of a CEL expression, the key-word `this` refers to the item being
-            evaluated, and property properties should be accessed by the names as they appear
-            in schema -- not necessarily as they appear in the generated code for a particular
-            language. For example, if you have a `Movie` item type with the property `rating`,
-            you could write a CEL expression like `this.rating == 'R'` to return only movies
-            that are rated `R`.
+            In the context of a CEL expression, the key-word `this` refers to
+            the item being evaluated, and property properties should be accessed
+            by the names as they appear in schema -- not necessarily as they
+            appear in the generated code for a particular language. For example,
+            if you have a `Movie` item type with the property `rating`, you
+            could write a CEL expression like `this.rating == 'R'` to return
+            only movies that are rated `R`.
 
             Find the full CEL language definition here:
             https://github.com/google/cel-spec/blob/master/doc/langdef.md
         :type cel_filters: list[tuple[type[T] | str, str]], optional
 
 
-        :param gt: An optional key path to filter results to only include items with a key greater than the
-            specified value based on lexicographic ordering. Defaults to None.
+        :param gt: An optional key path to filter results to only include items
+            with a key greater than the specified value based on lexicographic
+            ordering. Defaults to None.
         :type gt: str, optional
 
-        :param lt: An optional key path to filter results to only include items with a key less than the
-            specified value based on lexicographic ordering. Defaults to None.
+        :param lt: An optional key path to filter results to only include items
+            with a key less than the specified value based on lexicographic
+            ordering. Defaults to None.
         :type lt: str, optional
 
-        :param gte: An optional key path to filter results to only include items with a key greater than or equal
-            to the specified value based on lexicographic ordering. Defaults to None.
+        :param gte: An optional key path to filter results to only include items
+            with a key greater than or equal to the specified value based on
+            lexicographic ordering. Defaults to None.
         :type gte: str, optional
 
-        :param lte: An optional key path to filter results to only include items with a key less than or equal
-            to the specified value based on lexicographic ordering. Defaults to None.
+        :param lte: An optional key path to filter results to only include items
+            with a key less than or equal to the specified value based on
+            lexicographic ordering. Defaults to None.
         :type lte: str, optional
 
         :return: The result generator.
@@ -596,27 +614,28 @@ class Client:
 
     async def continue_list(self, token: ListToken) -> ListResult[StatelyItem]:
         """
-        continue_list takes the token from a begin_list call and returns the next
-        "page" of results based on the original query parameters and pagination
-        options. It doesn't have options because it is a continuation of a previous
-        list operation. It will return a new token which can be used for another
-        continue_list call, and so on. The token is the same one used by sync_list -
-        each time you call either continue_list or sync_list, you should pass the
-        latest version of the token, and then use the new token from the result in
-        subsequent calls. You may interleave continue_list and sync_list calls
-        however you like, but it does not make sense to make both calls in
-        parallel. Calls to continue_list are tied to the authorization of the
-        original begin_list call, so if the original begin_list call was allowed,
+        continue_list takes the token from a begin_list call and returns the
+        next "page" of results based on the original query parameters and
+        pagination options. It doesn't have options because it is a continuation
+        of a previous list operation. It will return a new token which can be
+        used for another continue_list call, and so on. The token is the same
+        one used by sync_list - each time you call either continue_list or
+        sync_list, you should pass the latest version of the token, and the
+        result will include a new version of the token to use in subsequent
+        calls. You may interleave continue_list and sync_list calls however you
+        like, but it does not make sense to make both calls in parallel. Calls
+        to continue_list are tied to the authorization of the original
+        begin_list call, so if the original begin_list call was allowed,
         continue_list with its token should also be allowed.
 
-        continue_list streams results via an AsyncGenerator, allowing you to handle
-        results as they arrive. You can call `collect()` on it to get all the
-        results as a list.
+        continue_list streams results via an AsyncGenerator, allowing you to
+        handle results as they arrive. You can call `collect()` on the results to
+        get all the results as a list if you'd rather wait for everything first.
 
-        You can list items of different types in a single continue_list, and you can
-        use `isinstance` to handle different item types.
+        You can list items of different types in a single continue_list, and you
+        can use `isinstance` to handle different item types.
 
-        :param token: The token from the previous list operation.
+        :param token: The latest token from a previous list operation.
         :type token: ListToken
 
         :return: The result generator.
@@ -652,32 +671,46 @@ class Client:
 
     async def sync_list(self, token: ListToken) -> ListResult[SyncResult]:
         """
-        sync_list returns all changes to Items within the result set of a previous
-        List operation. For all Items within the result set that were modified, it
-        returns the full Item at in its current state. It also returns a list of
-        Item key paths that were deleted since the last sync_list, which you should
-        reconcile with your view of items returned from previous
-        begin_list/continue_list calls. Using this API, you can start with an initial
-        set of items from begin_list, and then stay up to date on any changes via
-        repeated sync_list requests over time. The token is the same one used by
-        continue_list - each time you call either continue_list or sync_list, you
-        should pass the latest version of the token, and then use the new token
-        from the result in subsequent calls. Note that if the result set has
-        already been expanded to the end (in the direction of the original
-        begin_list request), sync_list will return newly created Items. You may
-        interleave continue_list and sync_list calls however you like, but it does
-        not make sense to make both calls in parallel. Calls to sync_list are tied
-        to the authorization of the original begin_list call, so if the original
-        begin_list call was allowed, sync_list with its token should also be allowed.
+        sync_list returns all changes to Items within the result set of a
+        previous List operation. For all Items within the result set that were
+        modified, it returns the full Item at in its current state. If the
+        result set has already been expanded to the end (in the direction of the
+        original begin_list request), sync_list will return newly created Items
+        as well. It also returns a list of Item key paths that were deleted
+        since the last sync_list, which you should reconcile with your view of
+        items returned from previous begin_list/continue_list calls. Using this
+        API, you can start with an initial set of items from begin_list, and
+        then stay up to date on any changes via repeated sync_list requests over
+        time.
+
+        The token is the same one used by continue_list - each time you call
+        either continue_list or sync_list, you should pass the latest version of
+        the token, and then use the new token from the result in subsequent
+        calls. You may interleave continue_list and sync_list calls however you
+        like, but it does not make sense to make both calls in parallel. Calls
+        to sync_list are tied to the authorization of the original begin_list
+        call, so if the original begin_list call was allowed, sync_list with its
+        token should also be allowed.
 
         sync_list streams results via an AsyncGenerator, allowing you to handle
-        results as they arrive. You can call `collect()` on it to get all the
-        results as a list.
+        results as they arrive. You can call `collect()` on the results to get all
+        the results as a list if you'd rather wait for everything first.
 
-        You can sync items of different types in a single syncList, and you can use
-        `isinstance` to handle different item types.
+        Each result will be one of the following types:
+            - SyncChangedItem: An item that was changed or added since the last
+              sync_list call.
+            - SyncDeletedItem: The key path of an item that was deleted since
+              the last sync_list call.
+            - SyncUpdatedItemKeyOutsideListWindow: An item that was updated but
+              is not within the current result set. You can treat this like
+              SyncDeletedItem, but the item hasn't actually been deleted, it's
+              just not part of your view of the list anymore.
+            - SyncReset: A reset signal that indicates any previously cached
+              view of the result set is no longer valid. You should throw away
+              any locally cached data. This will always be followed by a series
+              of SyncChangedItem that make up a new view of the result set.
 
-        :param token: The token from the previous list operation.
+        :param token: The latest token from a previous list operation.
         :type token: ListToken
 
         :return: The result generator.
@@ -723,57 +756,57 @@ class Client:
         """
         begin_scan initiates a scan request which will scan over the entire
         store and apply the provided filters. This API returns a token that you
-        can pass to continue_scan to paginate through the result set. This can
-        fail if the caller does not have permission to read Items.
+        can pass to continue_scan to paginate through the result set.
 
         begin_scan streams results via an AsyncGenerator, allowing you to handle
-        results as they arrive. You can call `collect()` on it to get all the
-        results as a list.
+        results as they arrive. You can call `collect()` on the results to get all
+        the results as a list if you'd rather wait for everything first.
 
         begin_scan can return items of many types, and you can use `isinstance`
         to handle different item types.
 
-        WARNING: THIS API CAN BE EXTREMELY EXPENSIVE FOR STORES WITH A LARGE NUMBER
-        OF ITEMS.
+        WARNING: THIS API CAN BE EXPENSIVE FOR STORES WITH A LARGE NUMBER OF
+        ITEMS.
 
         :param limit: The max number of items to retrieve. If set to 0 then the
             first page of results will be returned which may empty because it
-            does not contain items of your selected item types. Be sure to
-            check token.can_continue to see if there are more results to fetch.
+            does not contain items of your selected item types. Be sure to check
+            token.can_continue to see if there are more results to fetch.
             Defaults to 0.
         :type limit: int, optional
 
-        :param item_types: The item types to filter by. If not provided, all item
-            types will be returned.
+        :param item_types: The item types to filter by. If not provided, all
+            item types will be returned.
         :type item_types: list[type[T] | str], optional
 
-        :param cel_filters: An optional list of (item type, CEL expressions) tuples to filter
-            the results set by.
+        :param cel_filters: An optional list of (item type, CEL expressions)
+            tuples to filter the results set by.
 
-            CEL expressions are only evaluated for the item type they are defined for, and
-            do not affect other item types in the result set. This means if an item type has
-            no CEL filter and there are no item_type filters constraints, it will be included
-            in the result set.
+            CEL expressions are only evaluated for the item type they are
+            defined for, and do not affect other item types in the result set.
+            This means if an item type has no CEL filter and there are no
+            item_type filters constraints, it will be included in the result
+            set.
 
-            In the context of a CEL expression, the key-word `this` refers to the item being
-            evaluated, and property properties should be accessed by the names as they appear
-            in schema -- not necessarily as they appear in the generated code for a particular
-            language. For example, if you have a `Movie` item type with the property `rating`,
-            you could write a CEL expression like `this.rating == 'R'` to return only movies
-            that are rated `R`.
+            In the context of a CEL expression, the key-word `this` refers to
+            the item being evaluated, and property properties should be accessed
+            by the names as they appear in schema -- not necessarily as they
+            appear in the generated code for a particular language. For example,
+            if you have a `Movie` item type with the property `rating`, you
+            could write a CEL expression like `this.rating == 'R'` to return
+            only movies that are rated `R`.
 
             Find the full CEL language definition here:
             https://github.com/google/cel-spec/blob/master/doc/langdef.md
         :type cel_filters: list[tuple[type[T] | str, str]], optional
 
-        :param total_segments: The total number of segments to divide the
-            scan into. Use this when you want to parallelize your operation.
-            Defaults to None.
+        :param total_segments: The total number of segments to divide the scan
+            into. Use this when you want to parallelize your operation. Defaults
+            to None.
         :type total_segments: int, optional
 
-        :param segment_index: The index of the segment to scan.
-            Use this when you want to parallelize your operation.
-            Defaults to None.
+        :param segment_index: The index of the segment to scan. Use this when
+            you want to parallelize your operation. Defaults to None.
         :type segment_index: int, optional
 
         :return: The result generator.
@@ -825,13 +858,13 @@ class Client:
 
     async def continue_scan(self, token: ListToken) -> ListResult[StatelyItem]:
         """
-        continue_scan takes the token from a begin_scan call and returns the next
-        "page" of results based on the original query parameters and pagination
-        options.
+        continue_scan takes the token from a begin_scan call and returns the
+        next "page" of results based on the original query parameters and
+        pagination options.
 
-        continue_scan streams results via an AsyncGenerator, allowing you to handle
-        results as they arrive. You can call `collect()` on it to get all the
-        results as a list.
+        continue_scan streams results via an AsyncGenerator, allowing you to
+        handle results as they arrive. You can call `collect()` on the results to
+        get all the results as a list if you'd rather wait for everything first.
 
         You can scan items of different types in a single continue_scan, and you
         can use `isinstance` to handle different item types.
@@ -871,22 +904,28 @@ class Client:
 
     async def transaction(self) -> Transaction:
         """
-        Transaction creates a Transaction context manager, within which you can
-        issue writes and reads in any order, and all writes will either succeed
-        or all will fail.
+        transaction allows you to issue reads and writes in any order, and all
+        writes will either succeed or all will fail when the transaction
+        finishes. It should by used with an `async with` block to ensure that
+        the transaction is properly cleaned up.
 
         Reads are guaranteed to reflect the state as of when the transaction
-        started. This method may fail if another transaction commits before this
-        one finishes
-        - in that case, you should retry your transaction.
+        started. A transaction may fail if another transaction commits before
+        this one finishes - in that case, you should retry your transaction.
 
-        If any error is thrown from the handler, the transaction is aborted and
-        none of the changes made in it will be applied. If the handler returns
-        without error, the transaction is automatically committed.
+        If any error is thrown from the with block, the transaction is aborted
+        and none of the changes made in it will be applied. If the handler
+        returns without error, the transaction is automatically committed.
 
-        If any of the operations in the handler fails (e.g. a request is invalid)
-        you may not find out until the *next* operation, or once the handler
-        returns, due to some technicalities about how requests are handled.
+        If any of the operations in the with block fails (e.g. a request is
+        invalid) you may not find out until the *next* operation, or once the
+        block finishes, due to some technicalities about how requests are
+        handled.
+
+        When the transaction is committed, the result property will contain the
+        full version of any items that were put in the transaction, and the
+        committed property will be True. If the transaction was aborted, the
+        committed property will be False.
 
         :return: A new Transaction context manager.
         :rtype: Transaction

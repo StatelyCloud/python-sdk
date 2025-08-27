@@ -57,7 +57,7 @@ def key_id(val: AllKeyTypes) -> str:
     if isinstance(val, int):
         return str(val)
     if isinstance(val, UUID):  # type: ignore[reportUnnecessaryIsInstance]
-        return f"{encode_bytes(val.bytes)}"
+        return str(val)
     raise StatelyError(
         stately_code="InvalidKeyPath",
         code=Status.INVALID_ARGUMENT,

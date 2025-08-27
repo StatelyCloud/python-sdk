@@ -1,5 +1,4 @@
 from . import item_pb2 as _item_pb2
-from . import item_property_pb2 as _item_property_pb2
 from . import list_filters_pb2 as _list_filters_pb2
 from . import list_token_pb2 as _list_token_pb2
 from google.protobuf.internal import containers as _containers
@@ -32,12 +31,11 @@ OPERATOR_LESS_THAN: Operator
 OPERATOR_LESS_THAN_OR_EQUAL: Operator
 
 class BeginListRequest(_message.Message):
-    __slots__ = ("store_id", "key_path_prefix", "limit", "allow_stale", "sort_property", "sort_direction", "schema_version_id", "schema_id", "filter_conditions", "key_conditions")
+    __slots__ = ("store_id", "key_path_prefix", "limit", "allow_stale", "sort_direction", "schema_version_id", "schema_id", "filter_conditions", "key_conditions")
     STORE_ID_FIELD_NUMBER: _ClassVar[int]
     KEY_PATH_PREFIX_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
     ALLOW_STALE_FIELD_NUMBER: _ClassVar[int]
-    SORT_PROPERTY_FIELD_NUMBER: _ClassVar[int]
     SORT_DIRECTION_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_ID_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
@@ -47,13 +45,12 @@ class BeginListRequest(_message.Message):
     key_path_prefix: str
     limit: int
     allow_stale: bool
-    sort_property: _item_property_pb2.SortableProperty
     sort_direction: SortDirection
     schema_version_id: int
     schema_id: int
     filter_conditions: _containers.RepeatedCompositeFieldContainer[_list_filters_pb2.FilterCondition]
     key_conditions: _containers.RepeatedCompositeFieldContainer[KeyCondition]
-    def __init__(self, store_id: _Optional[int] = ..., key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., allow_stale: bool = ..., sort_property: _Optional[_Union[_item_property_pb2.SortableProperty, str]] = ..., sort_direction: _Optional[_Union[SortDirection, str]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ..., filter_conditions: _Optional[_Iterable[_Union[_list_filters_pb2.FilterCondition, _Mapping]]] = ..., key_conditions: _Optional[_Iterable[_Union[KeyCondition, _Mapping]]] = ...) -> None: ...
+    def __init__(self, store_id: _Optional[int] = ..., key_path_prefix: _Optional[str] = ..., limit: _Optional[int] = ..., allow_stale: bool = ..., sort_direction: _Optional[_Union[SortDirection, str]] = ..., schema_version_id: _Optional[int] = ..., schema_id: _Optional[int] = ..., filter_conditions: _Optional[_Iterable[_Union[_list_filters_pb2.FilterCondition, _Mapping]]] = ..., key_conditions: _Optional[_Iterable[_Union[KeyCondition, _Mapping]]] = ...) -> None: ...
 
 class ListResponse(_message.Message):
     __slots__ = ("result", "finished")
